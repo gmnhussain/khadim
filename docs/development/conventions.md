@@ -510,7 +510,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - Services write an **outbox** event in the same transaction as the state change; a relay enqueues it (`FOR UPDATE SKIP LOCKED`); the worker runs it.
 - Jobs are defined once with a Zod payload schema, validated on enqueue and on consume.
 - Queues per domain (`agent`, `social`, `memory`, `notifications`, `maintenance`), never per entity.
-- Deterministic job ids; "already exists" is success. Handlers are thin, idempotent and order-independent; every handler has a test that runs it twice.
+- Deterministic job ids; "already exists" is success. A job id deduplicates only while BullMQ holds the job, so handlers also check the state of their work first (a run handler claims `queued → running` and ignores any other status). Handlers are thin, idempotent and order-independent; every handler has a test that runs it twice, including after the first job was removed.
 - Retries with exponential backoff; invalid payloads fail once; exhausted jobs go to a dead-letter queue and mark the work failed.
 - **Schedules** live in a `schedules` table (cron expression, time zone, task, enabled). The worker syncs them to BullMQ repeatable jobs on start and on change. "Daily at 9 PM" means 9 PM in the schedule's time zone.
 

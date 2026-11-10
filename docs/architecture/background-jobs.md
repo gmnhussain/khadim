@@ -37,6 +37,8 @@ sequenceDiagram
 
 A crash between steps only causes a retry; deterministic job ids and idempotent handlers make retries safe.
 
+A deterministic job id deduplicates only while BullMQ still holds that job. Once a finished job is removed, the same id can be added again (for example, by the outbox backstop after a direct enqueue). So every handler also checks the state of the work it acts on before doing anything: `agent.run` claims its run (`queued → running`, or continues a stalled `running` run) and does nothing for any other status ([agent design](agent.md#1-run-lifecycle)); `agent.resume-run` does the same from `awaiting_approval` (ADR-0013); publish and reply jobs check the pending action's status and the stored platform id.
+
 ## Run event streams
 
 - The worker appends each run's events to the Redis Stream `agent:run-events:v1:<agentRunId>`; the API relays it over SSE (ADR-0010).

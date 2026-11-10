@@ -27,6 +27,7 @@ stateDiagram-v2
 - **Events:** the SSE response closes when the run pauses or ends; the web app reopens it when the run is running again (ADR-0013).
 - **Budgets:** the wall-clock limit counts running time only; waiting is bounded by pending action expiry (BR-05).
 - **Interruption:** a stalled job is retried and resumes from the last persisted step.
+- **Claim before work:** an `agent.run` job starts only by claiming its run with a guarded update (`queued → running`). If the run is already `running`, the job is BullMQ's retry of the same stalled job (a job id cannot be duplicated while that job exists) and continues from the last persisted step. Any other status means a late duplicate, for example an outbox backstop enqueued after BullMQ removed the finished job; the job ends without doing anything. Resume jobs claim the same way (`awaiting_approval → running`, ADR-0013).
 
 | Trigger | Where the run executes | Output |
 | --- | --- | --- |
