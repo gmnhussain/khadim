@@ -22,6 +22,7 @@ Status: **Planned** until the phase that builds the control; then **Tested** wit
 | Secrets at rest | OAuth tokens encrypted with AES-256-GCM; key from env | Unit test of crypto; repository test that tokens are never returned | 3 | Planned |
 | Webhook authenticity | Signature verified before parsing; replay window | Integration tests with valid, invalid and replayed signatures | 5 | Planned |
 | No content in logs | Logger redaction; logs carry ids, counts and timings only | Unit test of logger redaction | 1 | Planned |
+| No content in traces | OpenTelemetry GenAI content capture off; span attribute allowlist before export | Unit test exporting a model-call span and asserting no prompt, completion or tool payload attributes | 1 | Planned |
 | Dependency hygiene | Lockfile, `pnpm audit --prod` in CI, Dependabot | CI | 0 | In place |
 | Commit hygiene | `.env*` ignored; secrets never committed | `.gitignore`; CI secret scanning (to add) | 0 | In place |
 

@@ -456,6 +456,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 ### 15.9 Observability
 
 - Tracing follows OpenTelemetry, using the GenAI semantic conventions for model spans: one trace per run, spans for each model call and tool call, linked to `X-Request-Id`.
+- **Content capture is off.** Spans carry ids, provider, model, token counts, cost, finish reason and durations, never prompts, completions, tool arguments or tool results. Any instrumentation library's message-content option stays disabled, and span attributes pass through an allowlist before export. Content lives only in PostgreSQL and is read from there by the run detail page.
 - A run detail page replays the run: steps, prompts (by version), tool inputs and outputs, tokens, cost and timing.
 - Structured JSON logs (pino) with ids only; errors to an error tracker with run id tags.
 

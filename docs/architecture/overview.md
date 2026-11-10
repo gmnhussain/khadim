@@ -52,7 +52,7 @@ See [conventions §1](../development/conventions.md#1-principles). The ones that
 | Auth | Better Auth in the web app only; the BFF calls the API with a short-lived signed service token; private network access during development | Auth only at the edges; no public exposure without TOTP (ADR-0007) |
 | Streaming | Server-Sent Events relayed from Redis Streams | One-way token stream over plain HTTP; replay on reconnect; runs live in the worker (ADR-0010) |
 | Testing | Vitest, Supertest, Testcontainers, Playwright, evals | See [testing](../development/testing.md) |
-| Observability | pino logs, OpenTelemetry traces with GenAI conventions | Replayable runs without logging content |
+| Observability | pino logs, OpenTelemetry traces with GenAI conventions, content capture off | Replayable runs from PostgreSQL without logging or tracing content |
 
 ## Deliberately not used
 
