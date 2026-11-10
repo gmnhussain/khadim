@@ -207,7 +207,16 @@ Each module exposes its public API through `index.ts`; other modules import only
 
 ### 5.4 Packages
 
-- Workspace packages ship TypeScript source with one `exports` subpath per file; no barrels that drag server code into a browser bundle.
+- Workspace packages ship TypeScript source. **No package-root barrel**: no package exports `.`, so nothing imports "all of core" or drags server code into a browser bundle.
+- **Module barrels are the public surface.** Each core module's `index.ts` exports only what other modules and apps may use; `index.ts` is the only barrel kind allowed.
+
+| Package | `exports` subpaths | Used by |
+| --- | --- | --- |
+| `core` | `./<module>` → `src/<module>/index.ts` | apps; other core modules (relative import of the same `index.ts`) |
+| `core` | `./<module>/<file>.port`, `.types`, `.errors` → that file | `integrations` only (ports and types, never services, §5.3) |
+| `core` | `./<module>/testing` → `src/<module>/testing/index.ts` | tests only |
+| `contracts` | one subpath per file (`./<resource>`) | `web` and `api`; per file keeps browser bundles small |
+| `db` | `./schema`, `./client`, `./auth`, `./testing` | `core`, apps; `web` only `./auth` (ADR-0007) |
 - Next.js uses `transpilePackages`. Node apps run with `tsx watch` in development and are bundled with esbuild for production.
 
 ---
@@ -239,7 +248,7 @@ Root scripts: `dev`, `build`, `lint`, `typecheck`, `format`, `test`, `test:unit`
 - Discriminated results for expected outcomes: `{ ok: true; value } | { ok: false; problem }`.
 - `??` not `||`; early returns; never reassign parameters; no floating promises; never `!` to silence the compiler.
 - No magic numbers or strings: named constants (`MAX_AGENT_ITERATIONS`, `DEFAULT_POST_HOUR`).
-- One exported module or component per file. Barrels export only a module's public surface.
+- One exported module or component per file. The only barrels are core module `index.ts` files, and they export only the module's public surface (§5.4).
 - Timestamps in UTC; business times in the configured time zone (`Asia/Dhaka`).
 
 ---
