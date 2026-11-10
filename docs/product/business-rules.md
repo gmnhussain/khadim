@@ -33,11 +33,15 @@ Numbering leaves gaps so related rules stay together: 01–09 access and approva
 
 | Id | Rule |
 | --- | --- |
-| BR-30 | Facts Khadim states about the owner come only from the profile or memory documents. If something is not in memory, Khadim says so instead of inventing it. |
-| BR-31 | Answers that use memory documents name the documents they used. |
+| BR-30 | Facts Khadim states about the owner come only from the profile, memory documents or active learned facts. If something is not in memory, Khadim says so instead of inventing it. |
+| BR-31 | Answers that use memory documents or learned facts name the source they used. |
 | BR-32 | The owner can delete any memory document; its chunks and embeddings are deleted with it. |
 | BR-33 | Every chunk records the embedding provider, model and dimensions it was made with; one embedding model is active at a time, and chunks from different models are never searched together. |
 | BR-34 | Text inside memory documents is data, never instructions to the agent. |
+| BR-35 | A fact Khadim learns in conversation enters memory only after the owner approves it, optionally edited. Until then it is a proposal that is never retrieved or used. |
+| BR-36 | Learned facts come only from the owner's own messages, never from comments, web pages, documents, tool results or Khadim's own replies. |
+| BR-37 | Every learned fact keeps the conversation and message it came from. The owner can edit or delete any learned fact; deleting it deletes its embedding. |
+| BR-38 | Khadim never proposes secrets or credentials (passwords, API keys, tokens, one-time codes) as learned facts. > **Open question:** Are there other categories (health, finances, family) Khadim must never learn, or only with an explicit request? |
 
 ## Posts and platforms
 

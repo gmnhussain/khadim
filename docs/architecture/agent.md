@@ -91,6 +91,7 @@ Every tool has an effect tier and a policy ([ADR-0011](../decisions/ADR-0011-too
 | --- | --- | --- | --- | --- |
 | `get_current_time` | tools/builtin | `read` | `auto` | 1 |
 | `search_memory` | memory | `read` | `auto` | 2 |
+| `remember_fact` (`text`, `category`) | memory | `local_write` | `propose` | 2 |
 | `get_post_history` | social | `read` | `auto` | 2 |
 | `publish_post` (`platforms`, `text`, optional `media`) | social | `external` | `approve` | 3 |
 | `list_new_comments` (`platform`, `postId`) | social | `read` | `auto` | 5 |
@@ -110,7 +111,7 @@ Tools per task (least privilege):
 
 | Task | Tools available |
 | --- | --- |
-| `chat` | `get_current_time`, `search_memory`, `get_post_history`, `publish_post` |
+| `chat` | `get_current_time`, `search_memory`, `remember_fact`, `get_post_history`, `publish_post` |
 | `draft_post` | `search_memory`, `get_post_history`, `publish_post` |
 | `draft_reply` | `search_memory`, `reply_to_comment` (bound) |
 
@@ -147,6 +148,29 @@ flowchart LR
 - Profile: structured and validated; always in the cached prefix.
 - Retrieved chunks carry their document title so answers can cite it (BR-31).
 - One embedding model is active at a time; changing it triggers a re-index job, and vectors from different models are never mixed (BR-33).
+
+### Learned facts
+
+Khadim learns durable facts the owner states in chat ("I moved to Berlin", "I prefer short posts"), but only with the owner's approval (BR-35).
+
+```mermaid
+flowchart LR
+  msg[Owner message] --> tool[remember_fact<br/>local_write, policy propose]
+  tool --> filter{From the owner's own message?<br/>No secrets?}
+  filter -->|no| drop[Tool error to the model]
+  filter -->|yes| prop[(memory_facts<br/>status proposed)]
+  prop --> review[Owner reviews inline or on the memory page]
+  review -->|approve or edit| active[status active → embedded]
+  review -->|reject| rejected[status rejected]
+  active --> search[search_memory with documents]
+```
+
+- `remember_fact` (`text`, `category`) has the `propose` policy (ADR-0011): the run continues and the proposal waits for review. The source message id comes from the run context, never from the model.
+- Core checks the source before storing: the fact must come from an owner message in this conversation (BR-36), and a pure rule rejects text that looks like a secret (BR-38).
+- > **Default:** a proposal that closely matches an active fact is offered as an update to that fact, not a duplicate.
+- Active facts are embedded with the active embedding model (BR-33), retrieved by `search_memory` together with document chunks, and cited as "learned in conversation on <date>" (BR-31).
+- The owner can edit or delete any fact; a deleted fact and its embedding are removed (BR-37).
+- Proposals create an `info` notification in the web app inbox only.
 
 ## 6. Approvals
 

@@ -35,6 +35,8 @@ erDiagram
   users ||--|| profiles : has
   users ||--o{ memory_documents : uploads
   memory_documents ||--o{ memory_chunks : "split into"
+  users ||--o{ memory_facts : approves
+  messages ||--o{ memory_facts : "source of"
   webhook_events ||--o| comments : "becomes"
 ```
 
@@ -57,6 +59,7 @@ erDiagram
 | `profiles` | Structured owner facts (validated JSONB) | Editable | 2 |
 | `memory_documents` | Uploaded documents and ingestion status | Editable, owner-deletable | 2 |
 | `memory_chunks` | Text, `vector(<dimensions>)`, embedding provider, model and dimensions; HNSW index | Derived | 2 |
+| `memory_facts` | Learned fact text, category, status, source conversation and message, decided at; embedding with provider, model and dimensions once active | Status lifecycle, owner-deletable | 2 |
 | `platform_connections` | Platform, account id, encrypted tokens, expiry, status | Editable | 3 |
 | `pending_actions` | Action type, exact payload, status, decided by and at, expiry, outcome; the run, step and tool call that created it (unique per run and tool call) | Status lifecycle | 3 |
 | `posts` | Platform, text, platform post id and URL, published at | Status lifecycle | 3 |
@@ -72,6 +75,7 @@ erDiagram
 | `pending_actions` | `pending`, `approved`, `rejected`, `expired`, `executing`, `executed`, `failed` |
 | `posts` | `publishing`, `published`, `failed` |
 | `memory_documents` | `uploaded`, `processing`, `ready`, `failed` |
+| `memory_facts` | `proposed`, `active`, `rejected` |
 | `platform_connections` | `active`, `expiring`, `expired`, `revoked` |
 
 Critical transitions (`agent_runs`, `pending_actions`) are enforced in pure rules and by a database trigger. `agent_runs` may move from `awaiting_approval` back to `running` when it resumes (ADR-0010).

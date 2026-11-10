@@ -35,6 +35,7 @@
 | Autopilot | `autopilotPolicy` | A future per-action-type setting allowing execution without approval, within limits. Not built. |
 | Profile | `Profile` | Structured facts about the owner (career, skills, tone, topics, do and don't) the agent always sees. |
 | Memory document | `MemoryDocument`, `memory_documents` | A file the owner adds to memory, such as a CV or a project README. |
+| Learned fact | `MemoryFact`, `memory_facts` | A fact about the owner that Khadim proposed from the owner's own message; used only after the owner approves it. |
 | Chunk | `MemoryChunk`, `memory_chunks` | A section of a memory document with its embedding, used for retrieval. |
 | Embedding | `embedding` | A vector representing text meaning, used for similarity search. |
 | Retrieval | `retrievalService` | Finding the chunks most relevant to a question. |

@@ -32,7 +32,7 @@ A software developer wants a steady, authentic professional presence on LinkedIn
 ## 4. Product capabilities
 
 1. **Chat:** a streaming chat in the web app. Khadim answers from the owner's profile and memory documents and says when something is not in memory.
-2. **Memory:** the owner edits a structured profile and uploads documents (CV, project docs, past posts) that Khadim retrieves from.
+2. **Memory:** the owner edits a structured profile and uploads documents (CV, project docs, past posts) that Khadim retrieves from. Khadim also proposes facts it learns in conversation; each one is used only after the owner approves it.
 3. **Posts on request:** "Write a post about X for LinkedIn" produces a draft; the owner edits and approves; Khadim publishes.
 4. **Scheduled posts:** at configured times (for example daily, 9 PM Asia/Dhaka) Khadim drafts a career post and asks for approval.
 5. **Comment replies:** new comments on the owner's posts (where the platform allows) get reply drafts for approval.
@@ -44,7 +44,7 @@ A software developer wants a steady, authentic professional presence on LinkedIn
 | --- | --- | --- |
 | 0 | Docs foundation and monorepo scaffold | — |
 | 1 | Agent core: owner sign-in, run lifecycle, tool registry, tool-calling loop, streaming chat UI, run inspection, cost tracking; provider-neutral LLM port with Anthropic and OpenAI-compatible adapters, routing by task | BR-01, BR-20–BR-27 |
-| 2 | Memory: profile, document ingestion, retrieval, cited answers; post drafts in chat (not published); first evals; model choice per chat message and fallbacks | BR-30–BR-34 |
+| 2 | Memory: profile, document ingestion, retrieval, cited answers; post drafts in chat (not published); first evals; model choice per chat message and fallbacks; learned facts proposed in chat and approved by the owner | BR-30–BR-38 |
 | 3 | LinkedIn: OAuth connection, adapter, pending actions and approval, publishing job | BR-02–BR-06, BR-40–BR-44, BR-46 |
 | 4 | Schedules: create and manage schedules; scheduled drafts and approval notifications | BR-50–BR-53 |
 | 5 | Facebook Page: connection, adapter, comment webhooks, reply drafts | BR-45, BR-60–BR-64 |
@@ -71,6 +71,7 @@ A software developer wants a steady, authentic professional presence on LinkedIn
 | FR-15 | The owner sees daily and monthly cost and token totals, per provider and model. | 1 |
 | FR-16 | The owner chooses the provider and model for a chat message from an allowlist; otherwise the task's configured route is used. | 2 |
 | FR-17 | The owner can see which provider and model produced every answer, draft and reply. | 1 |
+| FR-18 | The owner reviews facts Khadim proposes to remember (inline in chat and on the memory page), and approves, edits, rejects or later deletes them. | 2 |
 
 ## 7. Non-functional requirements
 

@@ -168,7 +168,9 @@ packages/core/src/
   memory/
     embedder.port.ts
     profile.service.ts  documents.service.ts  retrieval.service.ts
+    facts.service.ts            learned facts: propose, approve, edit, delete
     chunking.rules.ts           pure chunking rules
+    fact.rules.ts               pure rules: source check, secret detection, duplicate matching
   social/
     social-platform.port.ts     SocialPlatform interface + Capabilities
     social.tools.ts             publish_post, list_new_comments, reply_to_comment
@@ -433,6 +435,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - **Documents:** CV, project docs and past posts ingested by a job: parse → chunk (pure, tested rules) → embed → store with source, model and dimensions.
 - **Retrieval:** top-k similarity search with a score threshold; retrieved chunks are labelled with their source; answers from memory cite which document they used.
 - **Post history:** topics and texts of published posts are retrievable so the agent avoids repetition.
+- **Learned facts:** the `remember_fact` tool (`local_write`, `propose`) stores proposals from the owner's own messages only; nothing is retrieved until the owner approves it; secrets are never proposed; every fact keeps its source message and is editable and deletable (BR-35–BR-38, [agent design §5](../architecture/agent.md#learned-facts)).
 - The embedding provider is a port; one embedding model is active at a time. Switching models means a re-index job, never mixed vectors; queries use the same model as the chunks they search.
 
 ### 15.7 Human approval
