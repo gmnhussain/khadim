@@ -234,7 +234,8 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Editor | `.editorconfig` (UTF-8, LF, 2 spaces), `.gitattributes` (`* text=auto eol=lf`). |
 | Boundaries | dependency-cruiser. |
 | Updates | Dependabot weekly; `pnpm audit --prod` in CI. |
-| CI supply chain | GitHub Actions pinned to full commit SHAs with the version in a trailing comment; container images pinned by digest; Dependabot updates both. |
+| CI supply chain | GitHub Actions pinned to full commit SHAs with the version in a trailing comment; container images run from workflow steps pinned by digest with the version in a comment, updated by hand. Dependabot updates the action SHAs. |
+| Secrets | gitleaks scans the full git history in CI on every PR and push; enable GitHub push protection when the repository plan offers it. |
 
 Root scripts: `dev`, `build`, `lint`, `typecheck`, `format`, `test`, `test:unit`, `test:integration`, `test:e2e`, `evals`, `depcruise`, `openapi:check`, and `db:generate | db:migrate | db:seed` on `@khadim/db`. Workspace packages use the `@khadim/*` scope. Scripts are added in the phase that introduces what they run.
 
@@ -552,7 +553,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - 12-factor: all config from env, validated with Zod at startup; `.env.example` per app with comments; `TZ=UTC` in every process.
 - Environments: `local` (seed data), `test` (containers in CI), `production`. Add `staging` when there is a second person or a risky migration.
 - Local infrastructure with Docker Compose on non-default ports, bound to localhost: PostgreSQL 18 + pgvector and Redis. A mail catcher is added when email features arrive.
-- **CI gates on every PR**, in the order `.github/workflows/ci.yml` runs them: frozen install → commitlint (pull requests) → format → lint → typecheck → unit and integration tests → depcruise → build → production audit. Each phase adds the gates it makes possible, in this order: coverage thresholds with the tests, migration check after build, OpenAPI check after build, e2e last.
+- **CI gates on every PR**, in the order `.github/workflows/ci.yml` runs them: frozen install → commitlint (pull requests) → format → lint → typecheck → unit and integration tests → depcruise → build → production audit, with a gitleaks history scan as a parallel job. Each phase adds the gates it makes possible, in this order: coverage thresholds with the tests, migration check after build, OpenAPI check after build, e2e last.
 - Deployment: one Docker image per app (multi-stage); only the reverse proxy is public; migrations run once before new containers start; daily database backups with a tested restore.
 
 ---

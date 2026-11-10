@@ -67,3 +67,22 @@ jobs:
 
       - name: Audit production dependencies
         run: pnpm audit --prod
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      # gitleaks v8.30.1, pinned by digest; update the digest and this comment together.
+      - name: Scan history with gitleaks
+        run: >-
+          docker run --rm
+          --user "$(id -u):$(id -g)"
+          -v "${{ github.workspace }}:/repo"
+          ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --no-banner --exit-code 1
