@@ -1,12 +1,13 @@
 # Background jobs and schedules
 
-**All slow or external work runs in `apps/worker` on BullMQ: agent runs from schedules and webhooks, publishing, replies, memory ingestion and maintenance. Rules: conventions §17.**
+**All slow or external work runs in `apps/worker` on BullMQ: every agent run and resume, publishing, replies, memory ingestion and maintenance. Rules: conventions §17; run execution: ADR-0010.**
 
 ## Queues and jobs
 
 | Queue | Job | Job id | Triggered by | Phase |
 | --- | --- | --- | --- | --- |
-| `agent` | `agent.run` | `agent.run.<agentRunId>` | Schedule firing, processed webhook event | 4, 5 |
+| `agent` | `agent.run` | `agent.run.<agentRunId>` | Chat message (enqueued directly, outbox as backstop), schedule firing, processed webhook event | 1 |
+| `agent` | `agent.resume-run` | `agent.resume.<agentRunId>.<stepIndex>` | Every pending action from a paused step resolved | 3 |
 | `social` | `social.publish-post` | `social.publish.<pendingActionId>` | Approved pending action (outbox) | 3 |
 | `social` | `social.reply-comment` | `social.reply.<pendingActionId>` | Approved pending action (outbox) | 5 |
 | `social` | `social.process-webhook` | `social.webhook.<webhookEventId>` | Stored webhook event | 5 |
@@ -33,6 +34,12 @@ sequenceDiagram
 ```
 
 A crash between steps only causes a retry; deterministic job ids and idempotent handlers make retries safe.
+
+## Run event streams
+
+- The worker appends each run's events to the Redis Stream `agent:run-events:v1:<agentRunId>`; the API relays it over SSE (ADR-0010).
+- Streams are transient: trimmed and expired after the run ends (> **Default:** 24 hours). The durable record is in PostgreSQL.
+- BullMQ queues and run event streams share the Redis instance, which uses `noeviction`, so neither loses entries under memory pressure.
 
 ## Schedules
 

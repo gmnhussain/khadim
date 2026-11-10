@@ -292,7 +292,7 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
 - Batch-load related rows; no N+1. Run independent queries with `Promise.all`.
 - One `config/env.ts` per app parses `process.env` with Zod at startup and exits on invalid config. Never read `process.env` elsewhere.
 - Express 5 forwards rejected promises; no `try/catch` in handlers.
-- Graceful shutdown on `SIGTERM`/`SIGINT`: stop accepting work, finish in-flight runs or mark them interrupted, close DB and Redis.
+- Graceful shutdown on `SIGTERM`/`SIGINT`: stop accepting work, finish the current step of in-flight runs (a retried job resumes them), close SSE responses, DB and Redis.
 
 ---
 
@@ -305,7 +305,7 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
 | Lists | `{ data, meta: { page, pageSize, total, totalPages } }`, or cursor pagination for append-only lists (messages, runs, events). Always bounded (`pageSize` ≤ 100). |
 | Create / update | `201` with `Location` and `ETag`; `PATCH` uses merge-patch meaning; `If-Match` required on editable resources (`428` missing, `412` stale). |
 | Idempotency | `Idempotency-Key` required on every POST that starts a run, publishes, replies or sends anything to a third party. Same key + same body → stored response replayed. |
-| Streaming | Chat answers stream as **Server-Sent Events** (`text/event-stream`) with typed events (`run.started`, `text.delta`, `tool.called`, `approval.required`, `run.completed`, `run.failed`). The run is persisted, so a dropped stream can resume from `GET /runs/{id}` and `Last-Event-ID`. |
+| Streaming | Runs execute in the worker; `GET /runs/{id}/events` relays the run's Redis Stream as **Server-Sent Events** (`text/event-stream`) with typed events (`run.started`, `text.delta`, `tool.called`, `approval.required`, `run.awaiting_approval`, `run.resumed`, `run.completed`, `run.failed`). The stream entry id is the SSE `id`, so `Last-Event-ID` resumes a dropped stream; after the stream expires, `GET /runs/{id}` returns the persisted run (ADR-0010). |
 | Async work | Long or background work answers `202` with a run or job id the client can poll. |
 | Webhooks | Verify the signature before anything else; store the raw payload; answer `200` fast; process in the worker. |
 | Errors | RFC 9457 problem details (§12). |
@@ -372,8 +372,9 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 ### 15.1 Run lifecycle
 
 - Every trigger (chat message, schedule, webhook) creates an `agent_run` with `trigger_type`, `trigger_ref`, `task`, `model`, and `prompt_version`. The loop never knows who triggered it.
-- States: `queued → running → (awaiting_approval →) succeeded | failed | cancelled`, enforced as a state machine. A run stuck past its timeout reads as failed.
-- Interactive chat runs stream from the API (§11). Scheduled and webhook runs execute in the worker. Both call the same `runAgent()` in core.
+- States: `queued → running ⇄ awaiting_approval → succeeded | failed | cancelled`, enforced as a state machine. A run stuck past its timeout reads as failed.
+- **Every run executes in the worker**, whatever triggered it, through the same `runAgent()` in core; the API only relays events (§11, ADR-0010).
+- **Runs are resumable:** a step that creates pending actions pauses the run (`awaiting_approval`, no worker held); when they are all resolved, their outcomes become tool results and the run resumes from persisted history. A stalled job resumes from the last persisted step.
 
 ### 15.2 LLM providers (ADR-0009)
 
@@ -426,7 +427,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 ### 15.7 Human approval
 
 - `pending_actions` hold the exact payload that will execute (platform, text, target comment), its status, who approved and when.
-- Approval is `POST /pending-actions/{id}/approve` with `Idempotency-Key` and `If-Match`; the owner may edit the payload before approving. Approval writes an outbox event; the worker executes it with a deterministic job id.
+- Approval is `POST /pending-actions/{id}/approve` with `Idempotency-Key` and `If-Match`; the owner may edit the payload before approving. Approval writes an outbox event; the worker executes it with a deterministic job id. Execution, rejection or expiry resolves the pending action and can resume the run that created it (§15.1).
 - An autopilot policy per action type may be added later, behind an ADR, with daily limits.
 
 ### 15.8 Cost and limits
@@ -473,7 +474,8 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 
 ## 17. Background jobs and scheduling
 
-- BullMQ on Redis in `apps/worker`. The API never does slow work in a request, except the streamed chat run.
+- BullMQ on Redis in `apps/worker`. The API never does slow work in a request, including agent runs; it relays run events from Redis Streams (ADR-0010).
+- A job the owner is waiting for (a chat run) is enqueued directly after its transaction commits, with the outbox as the backstop; the deterministic job id makes the duplicate a no-op.
 - Services write an **outbox** event in the same transaction as the state change; a relay enqueues it (`FOR UPDATE SKIP LOCKED`); the worker runs it.
 - Jobs are defined once with a Zod payload schema, validated on enqueue and on consume.
 - Queues per domain (`agent`, `social`, `memory`, `maintenance`), never per entity.

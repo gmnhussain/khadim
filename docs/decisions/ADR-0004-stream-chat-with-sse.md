@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Accepted |
+| Status | Superseded by [ADR-0010](ADR-0010-resumable-runs-in-worker.md) |
 | Date | 2026-11-10 |
 
 ## Context

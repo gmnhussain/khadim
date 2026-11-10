@@ -4,28 +4,32 @@
 
 ## 1. Run lifecycle
 
-Every trigger creates one `agent_run` (BR-20). The loop never knows what triggered it.
+Every trigger creates one `agent_run` (BR-20). The loop never knows what triggered it. Every run executes in the worker and can pause for approval and resume ([ADR-0010](../decisions/ADR-0010-resumable-runs-in-worker.md)).
 
 ```mermaid
 stateDiagram-v2
   [*] --> queued
-  queued --> running
-  running --> awaiting_approval: write tool created a pending action
-  awaiting_approval --> succeeded: run ends; approval continues separately
+  queued --> running: worker picks up the job
+  running --> awaiting_approval: a step created pending actions
+  awaiting_approval --> running: all of that step's pending actions resolved
   running --> succeeded: final answer
   running --> failed: error or limit reached
   queued --> cancelled
-  running --> cancelled: owner cancels
+  running --> cancelled: cancel honoured between steps
+  awaiting_approval --> cancelled
   succeeded --> [*]
   failed --> [*]
   cancelled --> [*]
 ```
 
-> **Default:** A run that creates a pending action ends as `succeeded` with the pending action linked. Execution after approval is a separate job, not a resumed run. This keeps runs short and approvals independent of model state.
+- **Pause:** once every tool call in a step is handled and the step created at least one pending action, the run moves to `awaiting_approval` and its job ends. No worker waits.
+- **Resume:** when each of that step's pending actions is executed, failed, rejected or expired, the outcomes become the tool results and an `agent.resume-run` job continues the loop. The model sees what happened ("published, post id …", "rejected by the owner").
+- **Budgets:** the wall-clock limit counts running time only; waiting is bounded by pending action expiry (BR-05).
+- **Interruption:** a stalled job is retried and resumes from the last persisted step.
 
 | Trigger | Where the run executes | Output |
 | --- | --- | --- |
-| Chat message | API, streamed over SSE | Assistant message; maybe pending actions |
+| Chat message | Worker; the API relays its events over SSE | Assistant message; maybe pending actions, then a resumed answer |
 | Schedule | Worker | Pending action for a post; owner notified |
 | Webhook (comment) | Worker | Pending action for a reply |
 
@@ -49,9 +53,17 @@ sequenceDiagram
       A-->>T: pending action id
     end
     T-->>S: tool results (or tool errors)
+    opt step created pending actions
+      S->>S: status awaiting_approval, job ends
+      Note over S,A: owner decides; execution job runs
+      A->>S: all resolved → agent.resume-run
+      S->>S: outcomes become tool results, status running
+    end
   end
   S-->>S: persist final answer, mark run finished
 ```
+
+Events (`text.delta`, `tool.called`, `approval.required`, …) go to the run's Redis Stream as they happen; the API relays them over SSE (ADR-0010).
 
 - **Limits** (BR-21): `MAX_AGENT_ITERATIONS`, per-run token and cost budgets, a wall-clock timeout. Each limit ends the run with its problem code (`RUN_ITERATION_LIMIT`, `RUN_BUDGET_EXCEEDED`).
 - **Parallelism:** independent read-only tools may run in parallel; write tools run one at a time.
@@ -123,9 +135,10 @@ sequenceDiagram
   W->>P: publish
   P-->>W: platform post id
   W->>DB: store post id, status executed
+  W->>W: step's pending actions all resolved → enqueue agent.resume-run
 ```
 
-Rules: BR-02 to BR-06. Executing twice is impossible: deterministic job id, stored platform post id, and a status check before calling the platform.
+Rules: BR-02 to BR-06. Executing twice is impossible: deterministic job id, stored platform post id, and a status check before calling the platform. Rejection and expiry also resolve a pending action and can resume the run.
 
 ## 7. Providers and model routing (ADR-0009)
 

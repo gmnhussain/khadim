@@ -10,10 +10,10 @@ flowchart LR
   web -->|typed client, SSE| api["apps/api<br/>Express 5"]
   platforms([LinkedIn / Facebook]) -->|webhooks| api
   api --> core["packages/core<br/>agent, tools, memory,<br/>social, approvals"]
-  worker["apps/worker<br/>BullMQ"] --> core
+  worker["apps/worker<br/>BullMQ, runs the agent"] --> core
   core --> db[(PostgreSQL 18<br/>+ pgvector)]
-  api --> redis[(Redis)]
-  worker --> redis
+  api -->|enqueue, read run events| redis[(Redis<br/>queues + run event streams)]
+  worker -->|jobs, write run events| redis
   core -. ports .- integrations["packages/integrations<br/>adapters"]
   integrations --> llm([LLM providers<br/>Claude, OpenAI, Gemini,<br/>local via Ollama])
   integrations --> embed([Embedding provider])
@@ -22,9 +22,9 @@ flowchart LR
 
 ## How a request flows
 
-- **Chat:** browser → web Server Action or SSE Route Handler → API `POST /api/v1/conversations/{id}/messages` → core starts an agent run and streams events back (ADR-0004).
-- **Scheduled post:** worker repeatable job → core starts a `draft_post` run → a pending action is created → owner approves in web → outbox event → worker publishes (ADR-0006).
-- **Comment:** platform webhook → API verifies and stores the raw event → worker processes it → core starts a `draft_reply` run → pending action → approval → worker replies.
+- **Chat:** browser → web Server Action → API `POST /api/v1/conversations/{id}/messages` → `202` with a run id; the worker runs it and writes events to a Redis Stream; the web SSE Route Handler → API `GET /api/v1/runs/{id}/events` relays them (ADR-0010).
+- **Scheduled post:** worker repeatable job → core starts a `draft_post` run → a pending action is created and the run pauses → owner approves in web → outbox event → worker publishes → the run resumes with the result (ADR-0006, ADR-0010).
+- **Comment:** platform webhook → API verifies and stores the raw event → worker processes it → core starts a `draft_reply` run → pending action → approval → worker replies → the run resumes and finishes.
 
 ## Principles
 
@@ -34,7 +34,7 @@ See [conventions §1](../development/conventions.md#1-principles). The ones that
 - **Ports and adapters:** core defines `LlmProvider`, `Embedder` and `SocialPlatform`; `packages/integrations` implements them, one adapter per vendor.
 - **Configurable models:** which provider and model serve each task is configuration, not code (ADR-0009).
 - **Humans approve side effects:** write tools only create pending actions.
-- **One run model:** chat, schedules and webhooks all create the same agent run.
+- **One run model:** chat, schedules and webhooks all create the same agent run, executed in the worker, able to pause for approval and resume.
 
 ## Technology choices
 
@@ -50,7 +50,7 @@ See [conventions §1](../development/conventions.md#1-principles). The ones that
 | LLM | Any provider behind the `LlmProvider` port: Anthropic first, OpenAI-compatible (local models and gateways), then OpenAI and Gemini; routed per task by configuration; hand-built loop | Learning the loop; cost control, resilience and a local option (ADR-0005, ADR-0009) |
 | Embeddings | Behind the `Embedder` port; several adapters possible, one active model; first choice pending | ADR-0008 (proposed), ADR-0009 |
 | Auth | Maintained library, not hand-built | ADR-0007 (proposed) |
-| Streaming | Server-Sent Events | One-way token stream over plain HTTP (ADR-0004) |
+| Streaming | Server-Sent Events relayed from Redis Streams | One-way token stream over plain HTTP; replay on reconnect; runs live in the worker (ADR-0010) |
 | Testing | Vitest, Supertest, Testcontainers, Playwright, evals | See [testing](../development/testing.md) |
 | Observability | pino logs, OpenTelemetry traces with GenAI conventions | Replayable runs without logging content |
 

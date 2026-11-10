@@ -43,7 +43,7 @@ erDiagram
 | `users` (+ auth library tables) | The owner and sessions | Editable | 1 |
 | `conversations` | Chat threads | Editable | 1 |
 | `messages` | Turns in a conversation, stored provider-neutral | Append-only | 1 |
-| `agent_runs` | One row per run: trigger, task, provider, model, prompt version, status, totals | Status lifecycle | 1 |
+| `agent_runs` | One row per run: trigger, task, provider, model, prompt version, status, totals, cancel-request marker | Status lifecycle | 1 |
 | `agent_steps` | Loop iterations | Append-only | 1 |
 | `llm_calls` | Provider, model, fallback flag, tokens (input, output, cached), cost, latency | Append-only | 1 |
 | `tool_calls` | Tool name, input, output or error, duration | Append-only | 1 |
@@ -54,7 +54,7 @@ erDiagram
 | `memory_documents` | Uploaded documents and ingestion status | Editable, owner-deletable | 2 |
 | `memory_chunks` | Text, `vector(<dimensions>)`, embedding provider, model and dimensions; HNSW index | Derived | 2 |
 | `platform_connections` | Platform, account id, encrypted tokens, expiry, status | Editable | 3 |
-| `pending_actions` | Action type, exact payload, status, decided by and at, expiry | Status lifecycle | 3 |
+| `pending_actions` | Action type, exact payload, status, decided by and at, expiry, outcome; the run, step and tool call that created it (unique per run and tool call) | Status lifecycle | 3 |
 | `posts` | Platform, text, platform post id and URL, published at | Status lifecycle | 3 |
 | `schedules` | Cron expression, time zone, task, settings, enabled | Editable | 4 |
 | `webhook_events` | Raw verified platform payloads | Append-only | 5 |
@@ -70,7 +70,7 @@ erDiagram
 | `memory_documents` | `uploaded`, `processing`, `ready`, `failed` |
 | `platform_connections` | `active`, `expiring`, `expired`, `revoked` |
 
-Critical transitions (`agent_runs`, `pending_actions`) are enforced in pure rules and by a database trigger.
+Critical transitions (`agent_runs`, `pending_actions`) are enforced in pure rules and by a database trigger. `agent_runs` may move from `awaiting_approval` back to `running` when it resumes (ADR-0010).
 
 ## Setup notes
 

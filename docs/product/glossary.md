@@ -9,6 +9,8 @@
 | Trigger | `triggerType`, `triggerRef` | What started a run: a chat message, a schedule or a webhook event. |
 | Task | `task` | The kind of work a run does (`chat`, `draft_post`, `draft_reply`); selects the model and prompt. |
 | Run step | `AgentStep`, `agent_steps` | One iteration of the loop: a model call and the tool calls it requested. |
+| Resume | `agent.resume-run` | Continuing a paused run once every pending action from its last step is resolved; the outcomes become tool results. |
+| Run event stream | `agent:run-events:v1:<agentRunId>` | The Redis Stream of a run's live events, relayed to the browser over SSE; transient. |
 | Loop | `agentLoop` | The cycle of calling the model, executing requested tools and returning results until a final answer. |
 | LLM call | `LlmCall`, `llm_calls` | One request to a language model, with tokens, cost and latency. |
 | LLM provider | `LlmProvider` | Port for language models; adapters implement it for Anthropic, OpenAI-compatible services, OpenAI and Gemini. |
