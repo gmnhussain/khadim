@@ -1,0 +1,7 @@
+# Markdown is written by hand and not reformatted (conventions §6).
+*.md
+pnpm-lock.yaml
+dist/
+.next/
+coverage/
+.turbo/

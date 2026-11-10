@@ -1,0 +1,167 @@
+# Agent design
+
+**How an agent run works: its lifecycle, the tool-calling loop, context building, tools, memory, approvals, model routing and limits. Rules here implement conventions §15.**
+
+## 1. Run lifecycle
+
+Every trigger creates one `agent_run` (BR-20). The loop never knows what triggered it.
+
+```mermaid
+stateDiagram-v2
+  [*] --> queued
+  queued --> running
+  running --> awaiting_approval: write tool created a pending action
+  awaiting_approval --> succeeded: run ends; approval continues separately
+  running --> succeeded: final answer
+  running --> failed: error or limit reached
+  queued --> cancelled
+  running --> cancelled: owner cancels
+  succeeded --> [*]
+  failed --> [*]
+  cancelled --> [*]
+```
+
+> **Default:** A run that creates a pending action ends as `succeeded` with the pending action linked. Execution after approval is a separate job, not a resumed run. This keeps runs short and approvals independent of model state.
+
+| Trigger | Where the run executes | Output |
+| --- | --- | --- |
+| Chat message | API, streamed over SSE | Assistant message; maybe pending actions |
+| Schedule | Worker | Pending action for a post; owner notified |
+| Webhook (comment) | Worker | Pending action for a reply |
+
+## 2. The loop
+
+```mermaid
+sequenceDiagram
+  participant S as AgentRunService
+  participant C as ContextBuilder
+  participant L as LlmProvider
+  participant T as ToolRegistry
+  participant A as ApprovalService
+  S->>C: build context (system prompt, profile, memory, history)
+  loop until final answer or limit
+    S->>L: messages + tool definitions
+    L-->>S: text and/or tool requests + usage
+    S->>S: persist step, record llm_call, check budgets
+    S->>T: execute requested tools (validated with Zod)
+    alt write tool
+      T->>A: create pending action
+      A-->>T: pending action id
+    end
+    T-->>S: tool results (or tool errors)
+  end
+  S-->>S: persist final answer, mark run finished
+```
+
+- **Limits** (BR-21): `MAX_AGENT_ITERATIONS`, per-run token and cost budgets, a wall-clock timeout. Each limit ends the run with its problem code (`RUN_ITERATION_LIMIT`, `RUN_BUDGET_EXCEEDED`).
+- **Parallelism:** independent read-only tools may run in parallel; write tools run one at a time.
+- **Errors:** invalid tool input or a failing tool returns an error result to the model so it can correct itself. Provider rate limits and overloads retry with backoff; other provider errors fail the run.
+- **Cancellation** is checked between steps.
+
+## 3. Context building
+
+Order matters for prompt caching: the stable prefix comes first and is cached.
+
+| Part | Source | Cached |
+| --- | --- | --- |
+| System prompt (role, rules, untrusted-content rule, output format) | Versioned prompt file for the task | Yes |
+| Tool definitions | Tool registry, filtered by task | Yes |
+| Owner profile | Profile service | Yes |
+| Retrieved memory, labelled with sources | Retrieval service | No |
+| Conversation history (recent turns verbatim, older summarised) | Pure history rule | No |
+| Current input; untrusted content wrapped and labelled | Trigger | No |
+
+## 4. Tools
+
+| Tool | Module | Write | Phase |
+| --- | --- | --- | --- |
+| `get_current_time` | tools/builtin | No | 1 |
+| `search_memory` | memory | No | 2 |
+| `get_post_history` | social | No | 2 |
+| `publish_post` (`platforms`, `text`, optional `media`) | social | Yes | 3 |
+| `list_new_comments` (`platform`, `postId`) | social | No | 5 |
+| `reply_to_comment` (bound to one comment per run, BR-64) | social | Yes | 5 |
+
+Tools per task (least privilege):
+
+| Task | Tools available |
+| --- | --- |
+| `chat` | `get_current_time`, `search_memory`, `get_post_history`, `publish_post` |
+| `draft_post` | `search_memory`, `get_post_history`, `publish_post` |
+| `draft_reply` | `search_memory`, `reply_to_comment` (bound) |
+
+The `platform` parameter's allowed values are generated from the adapter registry, so adding a platform adds no tools (conventions §15.4, §16).
+
+## 5. Memory
+
+```mermaid
+flowchart LR
+  upload[Owner uploads document] --> job[memory.ingest-document job]
+  job --> parse[parse] --> chunk[chunk: pure rules] --> embed[Embedder port] --> store[(memory_chunks<br/>vector + model + dimensions)]
+  question[Question] --> qembed[embed query] --> search[top-k similarity<br/>with threshold] --> context[labelled chunks in context]
+  store --> search
+```
+
+- Profile: structured and validated; always in the cached prefix.
+- Retrieved chunks carry their document title so answers can cite it (BR-31).
+- One embedding model is active at a time; changing it triggers a re-index job, and vectors from different models are never mixed (BR-33).
+
+## 6. Approvals
+
+```mermaid
+sequenceDiagram
+  participant Agent as Agent run
+  participant DB as PostgreSQL
+  participant Web as Owner (web)
+  participant API
+  participant W as Worker
+  participant P as Platform
+  Agent->>DB: insert pending_action (status: pending, exact payload)
+  Web->>API: POST /pending-actions/{id}/approve (Idempotency-Key, If-Match, optional edits)
+  API->>DB: status approved + outbox event (same transaction)
+  W->>DB: relay outbox → enqueue job (id: social.publish.{pendingActionId})
+  W->>P: publish
+  P-->>W: platform post id
+  W->>DB: store post id, status executed
+```
+
+Rules: BR-02 to BR-06. Executing twice is impossible: deterministic job id, stored platform post id, and a status check before calling the platform.
+
+## 7. Providers and model routing (ADR-0009)
+
+The loop talks only to the `LlmProvider` port. Which provider and model answer a call is decided by configuration.
+
+```mermaid
+flowchart LR
+  run[Agent run: task] --> resolve{Resolve route}
+  resolve -->|1| msg[Per-message override<br/>from allowlist]
+  resolve -->|2| sched[Schedule override]
+  resolve -->|3| task[Task route]
+  msg & sched & task --> check[Check capabilities<br/>and provider enabled]
+  check --> adapter[Adapter: anthropic, openai-compatible,<br/>openai, gemini]
+  adapter -->|unavailable after retries| fb[Next fallback route]
+  fb --> adapter
+```
+
+| Task | Default model class | Why |
+| --- | --- | --- |
+| `chat`, `classify`, `summarise` | Small, fast model (could be local) | Cost and latency for frequent calls |
+| `draft_post`, `draft_reply` | Stronger model | Writing quality matters; few calls per day |
+| `eval_grader` | Stronger model | Reliable judgements |
+
+> **Default:** Every task routes to Anthropic until other adapters exist. Exact model ids, prices and limits live in the model catalog configuration read by `model-registry.ts`, never in services.
+
+- Capabilities gate routing: a task that needs tools never routes to a model without tool support (BR-25).
+- Fallbacks run only after retries are exhausted on provider outage or rate limiting, and are recorded on the run (BR-26).
+- History is stored provider-neutral, so a conversation can switch model between messages.
+- Only enabled providers receive owner data (BR-27).
+
+## 8. Prompts
+
+- Files: `packages/core/src/agent/prompts/<purpose>.v<n>.md`. A change creates a new version.
+- Each run stores `prompt_version`. Prompt changes must pass evals against the previous baseline (conventions §15.10).
+- A provider-specific variant (`post-writer.v2.gemini.md`) is used only when evals show the base prompt underperforms on that provider.
+
+## 9. Security
+
+The controls for prompt injection, excessive agency, output handling and unbounded consumption are in [security](../security.md#llm-security).

@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Checks the commit message against Conventional Commits (conventions §3).
+pnpm exec commitlint --edit "$1"

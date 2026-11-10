@@ -1,0 +1,30 @@
+# Workspaces and the single version catalog (conventions §6).
+# Every dependency version lives here; package.json files use "catalog:".
+packages:
+  - apps/*
+  - packages/*
+
+# Fail install on the wrong Node.js or pnpm version (package.json "engines").
+engineStrict: true
+
+# pnpm 10 blocks dependency install scripts by default.
+# Allow one only with a reason, e.g.:
+# onlyBuiltDependencies:
+#   - esbuild # native binary used by the production bundle
+
+catalog:
+  "@commitlint/cli": ^19.8.1
+  "@commitlint/config-conventional": ^19.8.1
+  "@eslint/js": ^9.35.0
+  "@types/node": ^24.3.0
+  dependency-cruiser: ^17.0.1
+  eslint: ^9.35.0
+  eslint-config-prettier: ^10.1.8
+  eslint-import-resolver-typescript: ^4.4.4
+  eslint-plugin-import-x: ^4.16.1
+  globals: ^16.3.0
+  prettier: ^3.6.2
+  turbo: ^2.5.6
+  typescript: ^5.9.2
+  typescript-eslint: ^8.42.0
+  vitest: ^3.2.4
