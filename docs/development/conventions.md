@@ -246,6 +246,7 @@ Root scripts: `dev`, `build`, `lint`, `typecheck`, `format`, `test`, `test:unit`
 
 - No `any`; use `unknown` and narrow. Validate every untrusted shape at runtime with Zod: request bodies, env, job payloads, webhook bodies, **model tool inputs and structured model outputs**.
 - `as const` tuples and objects instead of `enum`; derive types from the source of truth (`z.infer`, Drizzle `$inferSelect`).
+- No `enum`, `namespace` or constructor parameter properties: only syntax that type stripping can erase (`erasableSyntaxOnly`, §6).
 - Factory functions with injected dependencies over classes (`createPostService(dependencies)`); classes only for errors.
 - Inject time and randomness (`now`, `randomId`); pure rules never read the clock.
 - Discriminated results for expected outcomes: `{ ok: true; value } | { ok: false; problem }`.
