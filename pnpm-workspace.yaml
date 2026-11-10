@@ -25,6 +25,6 @@ catalog:
   globals: ^17.14.0
   prettier: ^3.6.2
   turbo: ^2.5.6
-  typescript: ^5.9.2
+  typescript: ^6.0.3
   typescript-eslint: ^8.72.2
   vitest: ^5.1.0
