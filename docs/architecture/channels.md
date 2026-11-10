@@ -82,7 +82,7 @@ flowchart LR
 | `severity` | `info`, `warning`, `critical` |
 | `title`, `link` | Short text and a link into the web app |
 | `subject_type`, `subject_id` | What it is about (run, pending action, connection, …) |
-| `dedupe_key` | Unique; repeated events (a retried job, a daily expiry check) never create a second notification |
+| `dedupe_key` | Unique per occurrence: a retried job never creates a second notification, but a reminder that a rule repeats gets one per occurrence. The key includes what makes an occurrence distinct. > **Default:** `connection_expiring:<connectionId>:<date in Asia/Dhaka>`, so BR-46's daily warnings each arrive once a day |
 | `read_at` | Read marker; the only column updated after insert |
 
 ### Rules
