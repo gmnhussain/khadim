@@ -13,8 +13,8 @@ engineStrict: true
 #   - esbuild # native binary used by the production bundle
 
 catalog:
-  "@commitlint/cli": ^19.8.1
-  "@commitlint/config-conventional": ^19.8.1
+  "@commitlint/cli": ^21.2.4
+  "@commitlint/config-conventional": ^21.2.4
   "@eslint/js": ^9.35.0
   "@types/node": ^24.19.2
   dependency-cruiser: ^17.0.1
