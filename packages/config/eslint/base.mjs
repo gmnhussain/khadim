@@ -44,7 +44,8 @@ export function createBaseConfig({ tsconfigRootDir }) {
         "@typescript-eslint/no-misused-promises": "error",
         "@typescript-eslint/no-non-null-assertion": "error",
         "@typescript-eslint/switch-exhaustiveness-check": "error",
-        "import-x/no-cycle": "error",
+        // Cycles are checked once, by dependency-cruiser's no-circular rule; import-x/no-cycle
+        // duplicates it and is slow with type-aware linting.
         // TypeScript already checks member access on default imports.
         "import-x/no-named-as-default-member": "off",
         eqeqeq: ["error", "always"],

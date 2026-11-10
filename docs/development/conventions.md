@@ -228,7 +228,7 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Runtime | Node.js LTS pinned in `.nvmrc` and `engines`; `packageManager` pinned. |
 | Packages | pnpm workspaces; one version per dependency through `catalog:`; install scripts blocked by default; `pnpm install --frozen-lockfile` in CI; review the lockfile diff after every install. |
 | Tasks | Turborepo with declared outputs and env inputs; `dev` persistent and uncached; integration and e2e tests uncached. |
-| Lint | ESLint flat config, typescript-eslint `strictTypeChecked`, `import-x`, React Hooks, Next, `eslint-config-prettier` last; `--max-warnings 0`. Required rules: `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check`, `consistent-type-imports`, `no-explicit-any`, `no-non-null-assertion`, `import-x/no-cycle`, `eqeqeq`, `no-console`. |
+| Lint | ESLint flat config, typescript-eslint `strictTypeChecked`, `import-x`, React Hooks, Next, `eslint-config-prettier` last; `--max-warnings 0`. Required rules: `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check`, `consistent-type-imports`, `no-explicit-any`, `no-non-null-assertion`, `eqeqeq`, `no-console`. Import cycles are checked by dependency-cruiser (`no-circular`), not ESLint. |
 | Format | Prettier: `printWidth: 100`, `trailingComma: "all"`, Tailwind plugin. Markdown not formatted. |
 | TypeScript | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`; Bundler resolution. Tests typechecked separately. |
 | Editor | `.editorconfig` (UTF-8, LF, 2 spaces), `.gitattributes` (`* text=auto eol=lf`). |
