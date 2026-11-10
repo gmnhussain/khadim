@@ -5,6 +5,8 @@
 | Term | Code name | Meaning |
 | --- | --- | --- |
 | Owner | `owner`, `ownerUserId` | The single user who runs Khadim, chats with it and approves its actions. |
+| Service token | `serviceToken` | A short-lived JWT the web app signs to call the API on the owner's behalf; never reaches the browser. |
+| Access mode | `accessMode` | `private` (behind localhost, Tailscale or Cloudflare Access) or `public` (Better Auth with TOTP required). |
 | Agent run | `AgentRun`, `agent_runs` | One execution of the agent for one task, from trigger to final answer or failure. |
 | Trigger | `triggerType`, `triggerRef` | What started a run: a chat message, a schedule or a webhook event. |
 | Task | `task` | The kind of work a run does (`chat`, `draft_post`, `draft_reply`); selects the model and prompt. |

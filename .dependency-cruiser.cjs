@@ -27,10 +27,11 @@ module.exports = {
     },
     {
       name: "web-not-to-server-packages",
-      comment: "The browser app reaches the API only through contracts.",
+      comment:
+        "The browser app reaches the API only through contracts. ADR-0007: it may import only the auth tables of db.",
       severity: "error",
       from: { path: "^apps/web/" },
-      to: { path: "^packages/(core|integrations|db)/" },
+      to: { path: "^packages/(core|integrations|db)/", pathNot: "^packages/db/src/auth/" },
     },
     {
       name: "core-not-to-integrations",

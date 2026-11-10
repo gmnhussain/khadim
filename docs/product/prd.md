@@ -54,7 +54,7 @@ A software developer wants a steady, authentic professional presence on LinkedIn
 
 | Id | Requirement | Phase |
 | --- | --- | --- |
-| FR-1 | The owner signs in with a password and TOTP second factor. | 1 |
+| FR-1 | The owner signs in with a password and TOTP second factor; required before Khadim is reachable from the internet, optional in `private` access mode (ADR-0007). | 1 |
 | FR-2 | The owner chats with Khadim; answers stream as they are generated. | 1 |
 | FR-3 | Each conversation keeps its history; the owner can start, rename and archive conversations. | 1 |
 | FR-4 | The owner can open any run and see its steps, tool calls, tokens, cost and timing. | 1 |

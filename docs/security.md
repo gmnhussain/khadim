@@ -8,10 +8,12 @@ Status: **Planned** until the phase that builds the control; then **Tested** wit
 
 | Control | How | Proven by | Phase | Status |
 | --- | --- | --- | --- | --- |
-| Single owner, no sign-up | Auth library with sign-up disabled; owner seeded (BR-01) | Integration test: sign-up endpoint absent or rejected | 1 | Planned |
+| Single owner, no sign-up | Better Auth with sign-up disabled; owner seeded (BR-01) | Integration test: sign-up endpoint absent or rejected | 1 | Planned |
 | Strong authentication | Library password hashing, TOTP required, rate-limited sign-in | Integration tests for lockout and TOTP | 1 | Planned |
 | Session handling | httpOnly, `Secure`, `SameSite=Lax` cookies; server-side sessions | Integration test of cookie attributes | 1 | Planned |
 | No tokens in the browser | BFF; browser never calls the API | dependency-cruiser rule; e2e network check | 1 | Planned |
+| BFF-to-API authentication | Ed25519-signed service token, 60-second lifetime, audience and issuer checked; API never public (ADR-0007) | Integration tests: missing, expired, wrong-audience and wrongly signed tokens get `401` | 1 | Planned |
+| Network access | `private` mode only behind Tailscale or Cloudflare Access; `public` mode refuses to start without Better Auth and TOTP | Unit test of the web config schema rejecting `public` without auth | 1 | Planned |
 | Input validation | Zod on every body, query, env, job payload, webhook and tool input | Route tests for validation errors | 1 | Planned |
 | Security headers and CSP | Nonce-based CSP, HSTS, `nosniff`, frame denial, referrer policy | Integration test of headers | 1 | Planned |
 | CORS | Allowlist of the web origin | Integration test | 1 | Planned |

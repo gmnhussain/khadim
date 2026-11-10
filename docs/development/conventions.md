@@ -198,7 +198,7 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Rule | Why |
 | --- | --- |
 | apps → packages, never the reverse; no app imports another app | Packages are shared; apps are deployables. |
-| Only `api` and `worker` import `core`, `integrations`, `db` | The browser never gets server code. |
+| Only `api` and `worker` import `core`, `integrations`, `db`; the one exception is `web` importing `@khadim/db/auth` in server-only code (ADR-0007) | The browser never gets server code. |
 | `web` reaches the API only through `contracts` | One typed client. |
 | `core` imports only `db`, `contracts` (schemas only) and its own modules | Core stays vendor-free and testable. |
 | `integrations` imports `core` ports, never `core` services | Adapters implement interfaces; they hold no business rules. |
@@ -367,8 +367,10 @@ PostgreSQL 18 with Drizzle ORM and the pgvector extension.
 
 Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agent.
 
-- **Do not build auth from scratch.** Use a maintained library (choice recorded in an ADR) with: argon2id or the library's equivalent, httpOnly `Secure` `SameSite=Lax` cookies, server-side sessions, TOTP two-factor for the owner, rate-limited sign-in.
-- Browsers never hold tokens in JavaScript (BFF, §18).
+- **Do not build auth from scratch.** Better Auth (ADR-0007) with argon2id or the library's equivalent, httpOnly `Secure` `SameSite=Lax` cookies, server-side sessions, TOTP two-factor for the owner, rate-limited sign-in.
+- **Auth only at the edges (ADR-0007):** sessions are checked only in `apps/web`. The BFF calls the API with a 60-second Ed25519-signed service token carrying the owner id; the API verifies it and fills the request context. Webhook routes use platform signatures. Core never imports auth code.
+- **Access modes:** `private` (local, or behind Tailscale or Cloudflare Access; sign-in optional) and `public` (Better Auth with TOTP required; the web app refuses to start otherwise). The API is never public; only webhook routes are exposed through the reverse proxy.
+- Browsers never hold tokens in JavaScript (BFF, §18); the service token never reaches the browser.
 - Strict CSP with nonces; security headers (HSTS, `nosniff`, frame denial, referrer policy); CORS allowlist.
 - Secrets only in env files and the host's secret store; never in the repo, prompts, logs or error messages.
 - **Logs never contain** prompts, completions, chat text, comment text, tokens or personal data. They carry ids, counts, durations and error codes. Content lives in the database.

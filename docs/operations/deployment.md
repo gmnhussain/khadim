@@ -7,7 +7,8 @@
 ## Approach
 
 - One Docker image per app (`web`, `api`, `worker`), built with multi-stage Dockerfiles; images run as a non-root user.
-- Only a reverse proxy (TLS termination) is public; the API is reachable from the web app and platform webhooks only through it.
+- Access follows ADR-0007. In `private` mode the web app is reachable only through Tailscale or Cloudflare Access. In `public` mode a reverse proxy (TLS termination) is public and Better Auth with TOTP is required.
+- The API is never public. The web app reaches it on the private network with a service token; only its webhook routes are exposed through the reverse proxy, from Phase 3.
 - Database migrations run once, as a separate step, before new containers start.
 - PostgreSQL and Redis are managed services or containers with persistent volumes.
 - Daily database backups with a restore tested at least once per quarter.

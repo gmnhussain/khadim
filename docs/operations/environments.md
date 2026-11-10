@@ -10,6 +10,8 @@
 
 A `staging` environment is added when there is a second person or a risky migration (conventions §20).
 
+Every environment runs in an access mode (ADR-0007): `local` and any development host use `private` (localhost, Tailscale or Cloudflare Access); `production` uses `public` only once Better Auth with TOTP is configured, and stays `private` until then.
+
 ## Configuration
 
 - All configuration comes from environment variables, validated with Zod at startup; a process exits on invalid configuration.

@@ -49,7 +49,7 @@ See [conventions §1](../development/conventions.md#1-principles). The ones that
 | Jobs and schedules | BullMQ on Redis | Retries, repeatable jobs, deterministic job ids |
 | LLM | Any provider behind the `LlmProvider` port: Anthropic first, OpenAI-compatible (local models and gateways), then OpenAI and Gemini; routed per task by configuration; hand-built loop | Learning the loop; cost control, resilience and a local option (ADR-0005, ADR-0009) |
 | Embeddings | Behind the `Embedder` port; several adapters possible, one active model; first choice pending | ADR-0008 (proposed), ADR-0009 |
-| Auth | Maintained library, not hand-built | ADR-0007 (proposed) |
+| Auth | Better Auth in the web app only; the BFF calls the API with a short-lived signed service token; private network access during development | Auth only at the edges; no public exposure without TOTP (ADR-0007) |
 | Streaming | Server-Sent Events relayed from Redis Streams | One-way token stream over plain HTTP; replay on reconnect; runs live in the worker (ADR-0010) |
 | Testing | Vitest, Supertest, Testcontainers, Playwright, evals | See [testing](../development/testing.md) |
 | Observability | pino logs, OpenTelemetry traces with GenAI conventions | Replayable runs without logging content |
