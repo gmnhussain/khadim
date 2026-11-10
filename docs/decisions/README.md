@@ -15,6 +15,7 @@
 | [0009](ADR-0009-multi-provider-llm-and-embeddings.md) | Multi-provider LLM and embedding adapters | Accepted |
 | [0010](ADR-0010-resumable-runs-in-worker.md) | Resumable runs executed in the worker, streamed from Redis Streams | Accepted |
 | [0011](ADR-0011-tool-effect-tiers-and-policy.md) | Tool effect tiers and per-tool policy | Accepted |
+| [0012](ADR-0012-repositories-in-core-with-drizzle.md) | Repositories live in core and use Drizzle directly | Accepted |
 
 ## Template
 

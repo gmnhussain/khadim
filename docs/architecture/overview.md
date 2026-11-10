@@ -31,7 +31,7 @@ flowchart LR
 See [conventions §1](../development/conventions.md#1-principles). The ones that shape this architecture most:
 
 - **Thin edges, rich core:** apps parse input and wire dependencies; all logic is in `packages/core`.
-- **Ports and adapters:** core defines `LlmProvider`, `Embedder` and `SocialPlatform`; `packages/integrations` implements them, one adapter per vendor.
+- **Ports and adapters:** core defines `LlmProvider`, `Embedder`, `SocialPlatform`, `ChannelAdapter`, `NotificationSender` and `ToolSource`; `packages/integrations` implements them, one adapter per vendor. Persistence is the written exception: repositories in core use Drizzle directly (ADR-0012).
 - **Configurable models:** which provider and model serve each task is configuration, not code (ADR-0009).
 - **Humans approve side effects:** every tool has an effect tier (`read`, `local_write`, `external`) and a policy; `external` tools only create pending actions (ADR-0011).
 - **One run model:** chat, schedules and webhooks all create the same agent run, executed in the worker, able to pause for approval and resume.

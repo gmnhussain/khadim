@@ -20,7 +20,7 @@
 | Standards first | Use the relevant standard before inventing: RFC 9110 (HTTP), RFC 9457 (errors), RFC 7396 (merge patch), OWASP ASVS, OWASP Top 10 for LLM Applications, WCAG 2.2, OpenTelemetry. |
 | Fail closed | Deny by default. A forgotten check errors; it never leaks or publishes. |
 | Thin edges, rich core | Apps are thin shells. Business and agent logic live in `packages/core`, called by the API and the worker. |
-| Ports and adapters | Core defines interfaces (LLM, embeddings, social platforms); adapters implement them; apps wire them. Core never imports a vendor SDK. |
+| Ports and adapters | Core defines interfaces (LLM, embeddings, social platforms, channels, notifications); adapters implement them; apps wire them. Core never imports a vendor SDK. Persistence is the deliberate exception: repositories in core use Drizzle directly (ADR-0012). |
 | Contract-first | One Zod schema gives types, validation and OpenAPI. Frontend and API cannot drift. |
 | Humans approve side effects | The agent proposes; a person approves anything that leaves the system (posts, replies, messages). |
 | Untrusted by default | Everything the model reads from outside (comments, web pages, files) is data, never instructions. |
