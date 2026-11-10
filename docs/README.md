@@ -12,6 +12,7 @@
 | | [agent.md](architecture/agent.md) | Run lifecycle, loop, tools, memory, approvals |
 | | [data-model.md](architecture/data-model.md) | Planned tables and relationships |
 | | [background-jobs.md](architecture/background-jobs.md) | Queues, outbox, schedules |
+| | [channels.md](architecture/channels.md) | How the owner and Khadim talk: channels |
 | Decisions | [decisions/](decisions/README.md) | Architecture decision records (ADRs) |
 | Plans | [plans/](plans/README.md) | Implementation plans per phase |
 | Development | [setup.md](development/setup.md) | Getting a working local environment |

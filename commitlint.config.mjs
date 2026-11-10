@@ -8,6 +8,7 @@ const SCOPES = [
   "approvals",
   "schedules",
   "connections",
+  "channels",
   "web",
   "api",
   "worker",

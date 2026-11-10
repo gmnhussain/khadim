@@ -14,6 +14,7 @@ Numbering leaves gaps so related rules stay together: 01–09 access and approva
 | BR-04 | A pending action executes at most once. Once the platform returns a post id, it is stored and a retry never publishes again. |
 | BR-05 | A pending action not decided within its expiry window expires and can no longer be approved. > **Default:** 24 hours. > **Open question:** Is 24 hours right? |
 | BR-06 | Rejected and expired pending actions are kept for history and never deleted. |
+| BR-07 | A channel other than the web app accepts input only from identities the owner has linked to it. Messages from anyone else are ignored, never answered, and start no run. |
 
 ## Agent runs
 

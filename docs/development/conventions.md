@@ -93,6 +93,7 @@ docs/
     agent.md                      run lifecycle, loop, tools, memory, approvals
     data-model.md                 ER diagram
     background-jobs.md            queues, outbox, schedules
+    channels.md                   channel and notification ports
   decisions/                      ADR-NNNN-<kebab-title>.md + README.md index
   plans/                          implementation plans
   development/
@@ -176,6 +177,9 @@ packages/core/src/
     schedule.service.ts  schedule.repository.ts
   connections/
     connection.service.ts       OAuth connections; token encryption, expiry tracking, reconnect
+  channels/
+    channel.port.ts             ChannelAdapter interface + capabilities
+    channel.service.ts          inbound message → conversation → run; outbound delivery
   shared/
     errors.ts  request-context.ts  outbox.ts  audit.ts  crypto.ts
 ```

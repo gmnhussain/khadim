@@ -33,7 +33,10 @@
 | Chunk | `MemoryChunk`, `memory_chunks` | A section of a memory document with its embedding, used for retrieval. |
 | Embedding | `embedding` | A vector representing text meaning, used for similarity search. |
 | Retrieval | `retrievalService` | Finding the chunks most relevant to a question. |
-| Conversation | `Conversation`, `conversations` | A chat thread between the owner and Khadim. |
+| Conversation | `Conversation`, `conversations` | A chat thread between the owner and Khadim, on one channel. |
+| Channel | `ChannelAdapter`, `channel` | A surface where the owner converses with Khadim: `web`, later `telegram`, `email`, `voice`. |
+| Channel identity | `ChannelIdentity`, `channel_identities` | The owner's account on a channel (for example a Telegram user id), linked so that only the owner can start runs there. |
+| Inbound message | `InboundMessage` | A message from a channel, normalised by its adapter before it becomes a conversation message. |
 | Message | `Message`, `messages` | One turn in a conversation, from the owner or Khadim. |
 | Platform | `platform` | A social network Khadim can post to: `linkedin`, `facebook_page`. |
 | Adapter | `SocialPlatform` adapter | Code that implements a port for one vendor, such as the LinkedIn adapter. |

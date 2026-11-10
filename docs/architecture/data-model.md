@@ -17,6 +17,7 @@
 ```mermaid
 erDiagram
   users ||--o{ conversations : owns
+  users ||--o{ channel_identities : links
   conversations ||--o{ messages : contains
   conversations ||--o{ agent_runs : "chat runs"
   agent_runs ||--o{ agent_steps : has
@@ -41,8 +42,9 @@ erDiagram
 | Table | Purpose | Kind | Phase |
 | --- | --- | --- | --- |
 | `users` (+ auth library tables) | The owner and sessions | Editable | 1 |
-| `conversations` | Chat threads | Editable | 1 |
-| `messages` | Turns in a conversation, stored provider-neutral | Append-only | 1 |
+| `conversations` | Chat threads; `channel` and `channel_thread_ref` | Editable | 1 |
+| `messages` | Turns in a conversation, stored provider-neutral; `external_message_id` unique per channel | Append-only | 1 |
+| `channel_identities` | The owner's linked identity per channel (BR-07) | Editable | 6 |
 | `agent_runs` | One row per run: trigger, task, provider, model, prompt version, status, totals, cancel-request marker | Status lifecycle | 1 |
 | `agent_steps` | Loop iterations | Append-only | 1 |
 | `llm_calls` | Provider, model, fallback flag, tokens (input, output, cached), cost, latency | Append-only | 1 |
