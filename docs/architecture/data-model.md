@@ -48,7 +48,7 @@ erDiagram
 | `conversations` | Chat threads; `channel` and `channel_thread_ref` | Editable | 1 |
 | `messages` | Turns in a conversation, stored provider-neutral; `external_message_id` unique per channel | Append-only | 1 |
 | `channel_identities` | The owner's linked identity per channel (BR-07) | Editable | 6 |
-| `agent_runs` | One row per run: trigger, task, provider, model, prompt version, status, totals, cancel-request marker | Status lifecycle | 1 |
+| `agent_runs` | One row per run: trigger, task, provider, model, prompt version, status, totals, cancel-request marker, running-time counters (when it last entered `running`, running time used before pausing) | Status lifecycle | 1 |
 | `agent_steps` | Loop iterations | Append-only | 1 |
 | `llm_calls` | Provider, model, fallback flag, tokens (input, output, cached), cost, latency | Append-only | 1 |
 | `tool_calls` | Tool name, input, output or error, duration | Append-only | 1 |
@@ -78,7 +78,7 @@ erDiagram
 | `memory_facts` | `proposed`, `active`, `rejected` |
 | `platform_connections` | `active`, `expiring`, `expired`, `revoked` |
 
-Critical transitions (`agent_runs`, `pending_actions`) are enforced in pure rules and by a database trigger. `agent_runs` may move from `awaiting_approval` back to `running` when it resumes (ADR-0010).
+Critical transitions (`agent_runs`, `pending_actions`) are enforced in pure rules and by a database trigger. `agent_runs` may move from `awaiting_approval` back to `running` when it resumes, or to `cancelled`; never directly to `succeeded` or `failed` (ADR-0010, conventions §15.1).
 
 ## Setup notes
 

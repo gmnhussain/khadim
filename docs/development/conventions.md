@@ -397,7 +397,8 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 ### 15.1 Run lifecycle
 
 - Every trigger (chat message, schedule, webhook) creates an `agent_run` with `trigger_type`, `trigger_ref`, `task`, `model`, and `prompt_version`. The loop never knows who triggered it.
-- States: `queued → running ⇄ awaiting_approval → succeeded | failed | cancelled`, enforced as a state machine. A run stuck past its timeout reads as failed.
+- States, enforced as a state machine: `queued → running`; `running ⇄ awaiting_approval`; `running → succeeded | failed | cancelled`; `queued → cancelled`; `awaiting_approval → cancelled`. A paused run never ends directly as `succeeded` or `failed`: it resumes first (ADR-0010).
+- The wall-clock budget counts **running time only**, measured from when the run last entered `running` plus the running time it used before pausing. A run left in `running` past that budget is marked `failed`. A run in `awaiting_approval` is bounded by pending action expiry (BR-05), never by this timeout.
 - **Every run executes in the worker**, whatever triggered it, through the same `runAgent()` in core; the API only relays events (§11, ADR-0010).
 - **Runs are resumable:** a step that creates pending actions pauses the run (`awaiting_approval`, no worker held); when they are all resolved, their outcomes become tool results and the run resumes from persisted history. A stalled job resumes from the last persisted step.
 
