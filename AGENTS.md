@@ -51,4 +51,4 @@ A single-user assistant: chat all day with answers grounded in owner-controlled 
 
 ## Current phase
 
-Phase 0 (docs foundation and scaffold) is done and awaiting owner review. Next: Phase 1, agent core. See [roadmap](docs/product/prd.md#5-scope-by-phase).
+Phase 0 (docs foundation and scaffold) is done. Current: Phase 1a, the agent loop in core, per the approved [Phase 1 plan](docs/plans/phase-1-agent-core.md). See [roadmap](docs/product/prd.md#5-scope-by-phase).

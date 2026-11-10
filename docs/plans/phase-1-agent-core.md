@@ -20,7 +20,7 @@ The original Phase 1 bundled sign-in with TOTP, the run lifecycle, tool registry
 | **1c. Inspect, cost, route** | Run detail page; daily and monthly cost per provider and model; budgets enforced with in-app notifications; OpenAI-compatible adapter (local Ollama) with per-task routes and `chat` fallbacks. | FR-4, FR-15, FR-17; BR-21, BR-22, BR-26, BR-27 | 1b |
 | **1d. Ready for public** | Better Auth sign-in with TOTP, `public` mode, security headers and CSP, rate limits. | FR-1; BR-01; security.md application controls | 1b; required before any public exposure, at the latest before Phase 3 needs public callbacks |
 
-PRD §5 is updated to this split as part of the 1a work.
+PRD §5 lists this split.
 
 ## Prerequisite: tooling upgrades
 
@@ -58,7 +58,7 @@ Not in scope: database, Redis, apps, web UI, OpenAI-compatible adapter (1c), mem
 | integrations | `llm/anthropic` adapter (official SDK, streaming, prompt caching on the marked prefix, error mapping to `LLM_RATE_LIMITED`, `LLM_UNAVAILABLE` and `LLM_REFUSED`); `testing/contract` shared suite; recorded fixtures |
 | boundaries | Core production code imports only `zod` and `drizzle-orm`. `core-allowed-packages-only` excludes test files (`\.(test|int\.test|spec)\.ts$`, matching `not-to-dev-dependencies`) and `vitest.config.ts`, so tests can import `vitest` and Testcontainers. The Anthropic SDK is imported only in `integrations/src/llm/anthropic` |
 | tests | 100% coverage on `*.rules.ts`; loop scenarios with `FakeLlmProvider` (final answer, tool call, invalid tool input, iteration limit, cost limit, cancellation between steps, `approve` policy pausing the run, refusal ending the run); price-tier boundary cases in `usage.rules`; contract suite against the Anthropic fixtures |
-| docs | `docs/product/features/agent.md`; PRD §5 updated to the split; ADR-0008 untouched (embeddings are Phase 2) |
+| docs | `docs/product/features/agent.md`; ADR-0008 untouched (embeddings are Phase 2) |
 
 ### Decisions
 
