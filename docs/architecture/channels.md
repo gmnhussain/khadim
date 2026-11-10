@@ -48,7 +48,7 @@ sequenceDiagram
 ### Rules
 
 - Only the owner's linked identities can start runs from a channel; anything else is ignored and counted, never answered (BR-07).
-- A redelivered inbound message never starts a second run: `messages` has a unique (`channel`, `external_message_id`) (BR-20).
+- A redelivered inbound message never starts a second run: `messages` has its own `channel` column (held equal to its conversation's by a composite foreign key) and a unique (`channel`, `external_message_id`) (BR-20).
 - Message text from the owner is owner input. Attachments are memory-like documents and therefore untrusted data (BR-34).
 - > **Default:** approvals happen only in the web app. A channel can render approval actions only after an ADR shows that it authenticates the owner as strongly as the web app.
 - A conversation belongs to one channel (`conversations.channel`, `conversations.channel_thread_ref`).

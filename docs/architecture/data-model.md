@@ -45,8 +45,8 @@ erDiagram
 | Table | Purpose | Kind | Phase |
 | --- | --- | --- | --- |
 | `users` (+ auth library tables) | The owner and sessions | Editable | 1 |
-| `conversations` | Chat threads; `channel` and `channel_thread_ref` | Editable | 1 |
-| `messages` | Turns in a conversation, stored provider-neutral; `external_message_id` unique per channel | Append-only | 1 |
+| `conversations` | Chat threads; `channel` and `channel_thread_ref`; unique (`id`, `channel`) as the target of the messages foreign key | Editable | 1 |
+| `messages` | Turns in a conversation, stored provider-neutral; own `channel` column, kept equal to the conversation's by a composite foreign key (`conversation_id`, `channel`) → `conversations` (`id`, `channel`); unique (`channel`, `external_message_id`) | Append-only | 1 |
 | `channel_identities` | The owner's linked identity per channel (BR-07) | Editable | 6 |
 | `agent_runs` | One row per run: trigger, task, provider, model, prompt version, status, totals, cancel-request marker, running-time counters (when it last entered `running`, running time used before pausing) | Status lifecycle | 1 |
 | `agent_steps` | Loop iterations | Append-only | 1 |
