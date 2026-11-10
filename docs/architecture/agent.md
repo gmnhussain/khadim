@@ -116,6 +116,24 @@ Tools per task (least privilege):
 
 The `platform` parameter's allowed values are generated from the adapter registry, so adding a platform adds no tools (conventions §15.4, §16).
 
+### Tool sources
+
+The tool registry collects tools from **tool sources** behind a `ToolSource` port (`packages/core/src/tools/tool-source.port.ts`: `key`, `listTools()`, `callTool(name, input, context)`).
+
+| Source | Where | Phase |
+| --- | --- | --- |
+| Built-in tools | `packages/core/src/<module>/*.tools.ts` | 1 |
+| MCP servers (Khadim as an MCP client) | `packages/integrations/src/mcp`, one configured server per source | 6, with its own plan and ADR |
+
+Rules for MCP tools, so a new source cannot widen the agent's power by itself:
+
+- Only servers the owner lists in configuration are connected; their credentials stay in env and never reach model context.
+- Every MCP tool starts disabled. The owner enables it by giving it an effect tier and a policy (ADR-0011); until then it counts as `external`.
+- Tool descriptions and results from MCP servers are untrusted content (tool poisoning, prompt injection). The description approved with the tool is pinned; if the server changes it, the tool is disabled until the owner re-approves.
+- Input is validated against the tool's schema before the call; results are wrapped and labelled as untrusted, and size-limited.
+- Names are namespaced to avoid collisions. > **Default:** `mcp_<server>_<tool>` in snake_case.
+- Running local (stdio) servers needs a sandboxing decision, recorded in the Phase 6 ADR.
+
 ## 5. Memory
 
 ```mermaid

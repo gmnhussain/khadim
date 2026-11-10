@@ -162,6 +162,7 @@ packages/core/src/
   tools/
     tool.types.ts               ToolDefinition: name, description, Zod input, handler, effect tier
     tool-policy.rules.ts        pure rules: tier floor, policy resolution, limits, bindings
+    tool-source.port.ts         ToolSource interface (built-in tools now, MCP servers later)
     tool-registry.ts            registration, schema export, lookup, execution
     builtin/                    get_current_time, search_memory, …
   memory/
@@ -415,7 +416,8 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - **Tools with the `approve` policy never act directly.** They create a `pending_action`; execution happens only after approval (§15.7).
 - Shared actions across platforms use one generic tool with a `platform` parameter generated from the adapter registry; a platform-unique feature gets its own tool.
 - Tool count stays small; group by capability.
-- Later, tool groups can be exposed as MCP servers without changing core.
+- Tools come from **tool sources** behind a `ToolSource` port: built-in tools first, MCP servers later (Khadim as an MCP client, adapters in `integrations/src/mcp`). An MCP tool is disabled until the owner gives it a tier and policy; its description and results are untrusted content; a changed description disables it again ([agent design §4](../architecture/agent.md#tool-sources)).
+- Later, Khadim's own tool groups can also be exposed as MCP servers without changing core.
 
 ### 15.5 Prompts
 

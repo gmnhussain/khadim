@@ -12,6 +12,7 @@
 | `src/social/facebook-page` | `SocialPlatform` | 5 |
 | `src/channels/<vendor>` (Telegram, email, voice) | `ChannelAdapter` | 6 |
 | `src/notifications/<vendor>` (web push, email, Telegram) | `NotificationSender` | 6 |
+| `src/mcp` (MCP client, one source per configured server) | `ToolSource` | 6 |
 | `src/testing/contract` | Shared adapter contract suite | 1 |
 
 - Adapters map vendor shapes and errors; they hold no business rules (conventions §10.1).

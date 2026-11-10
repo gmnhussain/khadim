@@ -22,6 +22,8 @@
 | OpenAI-compatible adapter | `openai-compatible` | One adapter for any endpoint that speaks the Chat Completions format, including local models. |
 | Adapter contract suite | `adapterContract` | Shared tests every LLM and embedding adapter must pass. |
 | Tool | `ToolDefinition` | A capability the model may call, with a name, description, input schema and handler. |
+| Tool source | `ToolSource` | Where tools come from: built-in tools, later MCP servers. |
+| MCP server | `mcp` tool source | An external Model Context Protocol server whose tools Khadim may use once the owner enables each tool with a tier and policy. |
 | Tool call | `ToolCall`, `tool_calls` | One execution of a tool requested by the model. |
 | Effect tier | `effect` | What a tool changes: `read` (nothing), `local_write` (Khadim's own state), `external` (something outside Khadim). |
 | Tool policy | `ToolPolicy` | How a tool call executes: `auto` (now), `propose` (stored for the owner to accept later), `approve` (pending action; the run pauses). `external` tools are always `approve`. |
