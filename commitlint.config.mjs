@@ -9,6 +9,7 @@ const SCOPES = [
   "schedules",
   "connections",
   "channels",
+  "notifications",
   "web",
   "api",
   "worker",

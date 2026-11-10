@@ -180,6 +180,9 @@ packages/core/src/
   channels/
     channel.port.ts             ChannelAdapter interface + capabilities
     channel.service.ts          inbound message → conversation → run; outbound delivery
+  notifications/
+    notification-sender.port.ts NotificationSender interface
+    notification.service.ts     store (deduplicated), list, mark read, queue external delivery
   shared/
     errors.ts  request-context.ts  outbox.ts  audit.ts  crypto.ts
 ```
@@ -343,7 +346,7 @@ PostgreSQL 18 with Drizzle ORM and the pgvector extension.
 | Timestamps | `created_at`, `updated_at` as `timestamptz` in UTC. |
 | Concurrency | `version integer` on editable rows. |
 | Status | Status columns, not booleans, for anything with a lifecycle; transitions enforced in rules and, for critical ones (`pending_actions`, `agent_runs`), by a trigger. |
-| Append-only | `agent_steps`, `llm_calls`, `tool_calls`, `audit_logs`, `webhook_events`, `outbox` are inserted, never updated (except delivery markers). |
+| Append-only | `agent_steps`, `llm_calls`, `tool_calls`, `audit_logs`, `webhook_events`, `outbox`, `notifications` are inserted, never updated (except delivery and read markers). |
 | Deletion | Business history (posts, runs, approvals) is never hard-deleted. Memory documents may be deleted by the owner (their chunks and embeddings go with them). |
 | Money | LLM cost stored as `bigint` micro-USD, never floats. |
 | Embeddings | `vector(<dimensions>)` column plus the embedding `provider`, `model` and `dimensions` on every chunk, so re-indexing with a new model is possible; HNSW index. |
@@ -482,7 +485,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - A job the owner is waiting for (a chat run) is enqueued directly after its transaction commits, with the outbox as the backstop; the deterministic job id makes the duplicate a no-op.
 - Services write an **outbox** event in the same transaction as the state change; a relay enqueues it (`FOR UPDATE SKIP LOCKED`); the worker runs it.
 - Jobs are defined once with a Zod payload schema, validated on enqueue and on consume.
-- Queues per domain (`agent`, `social`, `memory`, `maintenance`), never per entity.
+- Queues per domain (`agent`, `social`, `memory`, `notifications`, `maintenance`), never per entity.
 - Deterministic job ids; "already exists" is success. Handlers are thin, idempotent and order-independent; every handler has a test that runs it twice.
 - Retries with exponential backoff; invalid payloads fail once; exhausted jobs go to a dead-letter queue and mark the work failed.
 - **Schedules** live in a `schedules` table (cron expression, time zone, task, enabled). The worker syncs them to BullMQ repeatable jobs on start and on change. "Daily at 9 PM" means 9 PM in the schedule's time zone.

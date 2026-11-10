@@ -18,6 +18,7 @@
 erDiagram
   users ||--o{ conversations : owns
   users ||--o{ channel_identities : links
+  users ||--o{ notifications : receives
   conversations ||--o{ messages : contains
   conversations ||--o{ agent_runs : "chat runs"
   agent_runs ||--o{ agent_steps : has
@@ -52,6 +53,7 @@ erDiagram
 | `idempotency_keys` | Stored responses for replayed POSTs | Expiring | 1 |
 | `outbox_events` | Reliable job enqueueing | Append-only + delivery marker | 1 |
 | `audit_logs` | Owner actions and security events | Append-only | 1 |
+| `notifications` | Kind, severity, title, link, subject, unique dedupe key ([channels](channels.md#notifications)) | Append-only + read marker | 1 |
 | `profiles` | Structured owner facts (validated JSONB) | Editable | 2 |
 | `memory_documents` | Uploaded documents and ingestion status | Editable, owner-deletable | 2 |
 | `memory_chunks` | Text, `vector(<dimensions>)`, embedding provider, model and dimensions; HNSW index | Derived | 2 |

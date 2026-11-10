@@ -36,6 +36,8 @@
 | Conversation | `Conversation`, `conversations` | A chat thread between the owner and Khadim, on one channel. |
 | Channel | `ChannelAdapter`, `channel` | A surface where the owner converses with Khadim: `web`, later `telegram`, `email`, `voice`. |
 | Channel identity | `ChannelIdentity`, `channel_identities` | The owner's account on a channel (for example a Telegram user id), linked so that only the owner can start runs there. |
+| Notification | `Notification`, `notifications` | A short message Khadim sends the owner unasked (approval waiting, budget reached, connection expiring); always shown in the web app inbox. |
+| Notification sender | `NotificationSender` | Port for delivering notifications outside the web app (web push, email, Telegram). |
 | Inbound message | `InboundMessage` | A message from a channel, normalised by its adapter before it becomes a conversation message. |
 | Message | `Message`, `messages` | One turn in a conversation, from the owner or Khadim. |
 | Platform | `platform` | A social network Khadim can post to: `linkedin`, `facebook_page`. |

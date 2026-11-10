@@ -1,6 +1,6 @@
-# Channels
+# Channels and notifications
 
-**How the owner and Khadim talk. A channel carries a conversation in both directions. It is a port, so adding Telegram, email or voice needs an adapter, not changes to the agent.**
+**How the owner and Khadim talk. A channel carries a conversation in both directions; a notification is a message Khadim starts. Both are ports, so adding Telegram, email or voice needs an adapter, not changes to the agent.**
 
 ## Channels
 
@@ -52,3 +52,43 @@ sequenceDiagram
 - Message text from the owner is owner input. Attachments are memory-like documents and therefore untrusted data (BR-34).
 - > **Default:** approvals happen only in the web app. A channel can render approval actions only after an ADR shows that it authenticates the owner as strongly as the web app.
 - A conversation belongs to one channel (`conversations.channel`, `conversations.channel_thread_ref`).
+
+## Notifications
+
+A notification is a short message Khadim sends to the owner without being asked: an approval is waiting, a run failed, the daily budget was reached (BR-22), a connection is about to expire (BR-46), a job reached the dead-letter queue.
+
+### Flow
+
+```mermaid
+flowchart LR
+  service[Core service] -->|same transaction| row[(notifications row<br/>+ outbox event)]
+  row --> inbox[Web app inbox<br/>always]
+  row --> job[notifications.deliver job] --> sender[NotificationSender adapter<br/>web push, email, Telegram]
+```
+
+- Every notification is stored first; the web app inbox reads the table, so in-app delivery never depends on a third party.
+- External delivery is a job per notification and sender, with a deterministic id, so retries never send twice.
+- A channel adapter that can send (Telegram) may also implement `NotificationSender`.
+
+### Port
+
+`NotificationSender` in `packages/core/src/notifications/notification-sender.port.ts`: `key`, `send(notification)`. Adapters live in `packages/integrations/src/notifications/<vendor>`.
+
+### Table and kinds
+
+| Field | Meaning |
+| --- | --- |
+| `kind` | `approval_required`, `run_failed`, `budget_reached`, `connection_expiring`, `connection_expired`, `job_dead_lettered`, `memory_fact_proposed` |
+| `severity` | `info`, `warning`, `critical` |
+| `title`, `link` | Short text and a link into the web app |
+| `subject_type`, `subject_id` | What it is about (run, pending action, connection, …) |
+| `dedupe_key` | Unique; repeated events (a retried job, a daily expiry check) never create a second notification |
+| `read_at` | Read marker; the only column updated after insert |
+
+### Rules
+
+- > **Default:** in Phase 1 delivery is in-app only. When the first external sender exists, `warning` and `critical` notifications also go there.
+- > **Default:** external senders receive only the title and the link, never draft text, comment text or memory content; the owner opens the web app to see the content.
+- Notifications carry no secrets and are never logged with their text (conventions §14).
+
+> **Open question:** Should there be quiet hours (for example no external notifications at night in Asia/Dhaka), and which kinds may break them?
