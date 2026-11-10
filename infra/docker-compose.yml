@@ -5,7 +5,6 @@ name: khadim
 services:
   postgres:
     image: pgvector/pgvector:pg18
-    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-khadim}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in infra/.env}
@@ -24,7 +23,6 @@ services:
 
   redis:
     image: redis:8-alpine
-    restart: unless-stopped
     # BullMQ requires noeviction so queued jobs are never dropped.
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     ports:
