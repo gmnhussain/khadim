@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Accepted |
+| Status | Accepted (extended by ADR-0015) |
 | Date | 2026-11-10 |
 
 ## Context

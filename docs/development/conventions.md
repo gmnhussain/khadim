@@ -381,7 +381,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 
 - **Do not build auth from scratch.** Better Auth (ADR-0007) with argon2id or the library's equivalent, httpOnly `Secure` `SameSite=Lax` cookies, server-side sessions, TOTP two-factor for the owner, rate-limited sign-in.
 - **Auth only at the edges (ADR-0007):** sessions are checked only in `apps/web`. The BFF calls the API with a 60-second Ed25519-signed service token carrying the owner id; the API verifies it and fills the request context. Webhook routes use platform signatures. Core never imports auth code.
-- **Access modes:** `private` (local, or behind Tailscale or Cloudflare Access; sign-in optional) and `public` (Better Auth with TOTP required; the web app refuses to start otherwise). The API is never public; only webhook routes are exposed through the reverse proxy.
+- **Access modes:** `private` (local, or behind Tailscale or Cloudflare Access; sign-in optional, but the web app checks its configured gate on every request and answers `403` when it fails, ADR-0015) and `public` (Better Auth with TOTP required; the web app refuses to start otherwise). The API is never public; only webhook routes are exposed through the reverse proxy.
 - Browsers never hold tokens in JavaScript (BFF, §18); the service token never reaches the browser.
 - Strict CSP with nonces; security headers (HSTS, `nosniff`, frame denial, referrer policy); CORS allowlist.
 - Secrets only in env files and the host's secret store; never in the repo, prompts, logs or error messages.

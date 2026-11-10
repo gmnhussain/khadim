@@ -13,7 +13,7 @@ Status: **Planned** until the phase that builds the control; then **Tested** wit
 | Session handling | httpOnly, `Secure`, `SameSite=Lax` cookies; server-side sessions | Integration test of cookie attributes | 1 | Planned |
 | No tokens in the browser | BFF; browser never calls the API | dependency-cruiser rule; e2e network check | 1 | Planned |
 | BFF-to-API authentication | Ed25519-signed service token, 60-second lifetime, audience and issuer checked; API never public (ADR-0007) | Integration tests: missing, expired, wrong-audience and wrongly signed tokens get `401` | 1 | Planned |
-| Network access | `private` mode only behind Tailscale or Cloudflare Access; `public` mode refuses to start without Better Auth and TOTP | Unit test of the web config schema rejecting `public` without auth | 1 | Planned |
+| Network access | `private` mode only behind Tailscale or Cloudflare Access, and the web app checks its gate on every request (peer address or Cloudflare Access JWT), failing closed (ADR-0015); `public` mode refuses to start without Better Auth and TOTP | Unit tests of the web config schema (`public` without auth, `private` without a gate) and of each gate (wrong peer, missing, forged, expired or wrong-audience JWT, forwarded headers ignored) | 1 | Planned |
 | Input validation | Zod on every body, query, env, job payload, webhook and tool input | Route tests for validation errors | 1 | Planned |
 | Security headers and CSP | Nonce-based CSP, HSTS, `nosniff`, frame denial, referrer policy | Integration test of headers | 1 | Planned |
 | CORS | Allowlist of the web origin | Integration test | 1 | Planned |
