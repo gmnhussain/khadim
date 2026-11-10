@@ -48,7 +48,7 @@ All must pass with zero warnings before a change is ready (conventions §22).
 | PostgreSQL | 55432 |
 | Redis | 56379 |
 
-The single source is `@khadim/config/ports`; `infra/docker-compose.yml` uses the same defaults.
+The single source is `@khadim/config/ports`; `infra/docker-compose.yml` and each app's `.env.example` use the same values. Apps read their port from the environment, never from `@khadim/config` at runtime.
 
 ## Environment variables
 

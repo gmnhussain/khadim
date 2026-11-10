@@ -204,6 +204,7 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Every import resolves | An unresolved import could slip past the allowlist. |
 | `integrations` imports `core` ports, never `core` services | Adapters implement interfaces; they hold no business rules. |
 | Modules import each other only through `index.ts`; no cycles | Clear module boundaries. |
+| Production code never imports devDependencies, including `@khadim/config` (tooling presets and the local port map) | `pnpm install --prod` images contain only what runs; apps read ports from env. |
 
 ### 5.4 Packages
 

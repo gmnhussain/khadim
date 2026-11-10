@@ -95,6 +95,17 @@ module.exports = {
       },
       to: { dependencyTypes: ["npm-dev"] },
     },
+    {
+      name: "no-config-in-production",
+      comment:
+        "@khadim/config is tooling, installed as a devDependency. Workspace imports resolve to local paths, which not-to-dev-dependencies cannot classify, so this rule names the package.",
+      severity: "error",
+      from: {
+        path: "^(apps|packages)/[^/]+/src/",
+        pathNot: "\\.(test|int\\.test|spec)\\.ts$",
+      },
+      to: { path: "^packages/config/" },
+    },
   ],
   options: {
     doNotFollow: { path: "node_modules" },

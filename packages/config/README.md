@@ -11,11 +11,13 @@
 | `@khadim/config/eslint/base` | Base for future presets |
 | `@khadim/config/prettier` | Root `prettier.config.mjs` |
 | `@khadim/config/vitest` | `vitestBaseConfig`, merged in each workspace's `vitest.config.ts` |
-| `@khadim/config/ports` | `PORTS` constants for local development |
+| `@khadim/config/ports` | `PORTS` constants for local development: tooling, tests and scripts only |
 
 ## Dependencies
 
 Every dependency of this package is a `devDependency`: it is build and lint tooling, never shipped code. Workspaces add `@khadim/config` as a `devDependency` too, so `pnpm audit --prod` audits only what runs in production and stays strict.
+
+Production code (`src/`, outside test files) never imports `@khadim/config`, including `ports`; dependency-cruiser's `no-config-in-production` rule enforces this. Apps read their port from validated environment variables, and each app's `.env.example` uses the value from `PORTS`.
 
 ## Added later
 
