@@ -130,7 +130,7 @@ The tool registry collects tools from **tool sources** behind a `ToolSource` por
 Rules for MCP tools, so a new source cannot widen the agent's power by itself:
 
 - Only servers the owner lists in configuration are connected; their credentials stay in env and never reach model context.
-- Every MCP tool starts disabled. The owner enables it by giving it an effect tier and a policy (ADR-0011); until then it counts as `external`.
+- Every MCP tool starts disabled and is never offered to the model until the owner gives it an effect tier and a policy (ADR-0011, ADR-0014).
 - Tool descriptions and results from MCP servers are untrusted content (tool poisoning, prompt injection). The description approved with the tool is pinned; if the server changes it, the tool is disabled until the owner re-approves.
 - Input is validated against the tool's schema before the call; results are wrapped and labelled as untrusted, and size-limited.
 - Names are namespaced to avoid collisions. > **Default:** `mcp_<server>_<tool>` in snake_case.

@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Accepted |
+| Status | Accepted (extended by ADR-0014) |
 | Date | 2026-11-10 |
 | Relates to | Extends ADR-0006 (human approval); works with ADR-0010 (resumable runs) |
 

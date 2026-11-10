@@ -37,7 +37,7 @@ Status: **Planned** until the phase that builds the control; then **Tested** wit
 | Data sent to third-party providers | Only enabled providers receive data (BR-27); sensitive tasks can route to a local model; one API key per provider, server-side only | Unit test of provider registry and routing rules | 1 | Planned |
 | Unbounded consumption | Iteration, token, cost and time limits; daily budget (BR-21, BR-22) | Unit tests of budget rules | 1 | Planned |
 | Supply chain | Pinned SDK versions per provider adapter; adapters re-run the contract suite on upgrade | Dependabot PR review and contract suite | 1 | Planned |
-| Tool poisoning (MCP) | Owner-listed servers only; each tool disabled until given a tier and policy; pinned descriptions, re-approval on change; results treated as untrusted | Unit tests of the MCP tool source: unknown tool disabled, changed description disabled | 6 | Planned |
+| Tool poisoning (MCP) | Owner-listed servers only; each tool disabled until given a tier and policy; pinned descriptions, re-approval on change; results treated as untrusted | Unit tests of the MCP tool source and registry: unclassified tool never offered to the model, changed description disables it (ADR-0014) | 6 | Planned |
 | Misinformation | Facts about the owner only from memory (BR-30); citations (BR-31) | Eval cases for grounding | 2 | Planned |
 | Memory poisoning | Learned facts only from the owner's own messages (BR-36), used only after approval (BR-35); secrets never proposed (BR-38) | Unit tests of `fact.rules.ts` (source check, secret detection); eval cases where a document or comment asks Khadim to remember something | 2 | Planned |
 

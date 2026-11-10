@@ -426,7 +426,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 ### 15.4 Tools
 
 - A tool is a `ToolDefinition`: snake_case `verb_noun` name, a description written for the model (what it does, when to use it, what it returns), a Zod input schema converted to JSON Schema, a handler, and an **effect tier**: `read`, `local_write` (changes Khadim's own state) or `external` (leaves the system) (ADR-0011).
-- **Every tool has a policy** in configuration: `auto` (execute now), `propose` (store a proposal the owner accepts later; the run continues) or `approve` (pending action; the run pauses). The tier is a floor: `external` is always `approve`; an unclassified tool counts as `external`. Policies also set per-run and per-day call limits and arguments bound by the run. An invalid policy stops the app at startup.
+- **Every tool has a policy** in configuration: `auto` (execute now), `propose` (store a proposal the owner accepts later; the run continues) or `approve` (pending action; the run pauses). The tier is a floor: `external` is always `approve`. A tool without an owner-assigned tier and policy is never offered to the model; `external` is assumed only when validation meets an unknown tool name (ADR-0014). Policies also set per-run and per-day call limits and arguments bound by the run. An invalid policy stops the app at startup.
 - **Validate model-supplied input with Zod before executing.** Invalid input returns a tool error the model can read and fix, not an exception.
 - Tool errors go back to the model as error results with a short, actionable message.
 - Tool outputs are compact and structured; never dump raw API responses or secrets into context.
