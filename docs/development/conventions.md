@@ -217,7 +217,7 @@ Each module exposes its public API through `index.ts`; other modules import only
 | `core` | `./<module>/testing` → `src/<module>/testing/index.ts` | tests only |
 | `contracts` | one subpath per file (`./<resource>`) | `web` and `api`; per file keeps browser bundles small |
 | `db` | `./schema`, `./client`, `./auth`, `./testing` | `core`, apps; `web` only `./auth` (ADR-0007) |
-- Next.js uses `transpilePackages`. Node apps run with `tsx watch` in development and are bundled with esbuild for production.
+- Next.js uses `transpilePackages`. Node apps run with `tsx watch` in development and are bundled with esbuild for production. Node's built-in type stripping is not used yet: it needs explicit `.ts` import extensions and NodeNext resolution, while the standard uses Bundler resolution. Revisit by ADR if `tsx` becomes a problem.
 
 ---
 
@@ -230,7 +230,7 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Tasks | Turborepo with declared outputs and env inputs; `dev` persistent and uncached; integration and e2e tests uncached. |
 | Lint | ESLint flat config, typescript-eslint `strictTypeChecked`, `import-x`, React Hooks, Next, `eslint-config-prettier` last; `--max-warnings 0`. Required rules: `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check`, `consistent-type-imports`, `no-explicit-any`, `no-non-null-assertion`, `eqeqeq`, `no-console`. Import cycles are checked by dependency-cruiser (`no-circular`), not ESLint. |
 | Format | Prettier: `printWidth: 100`, `trailingComma: "all"`, Tailwind plugin. Markdown not formatted. |
-| TypeScript | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`; Bundler resolution. Tests typechecked separately. |
+| TypeScript | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`; Bundler resolution. Tests typechecked separately. `erasableSyntaxOnly` enforces §7 (no `enum`, namespaces or parameter properties) and keeps the code runnable by plain type stripping. |
 | Editor | `.editorconfig` (UTF-8, LF, 2 spaces), `.gitattributes` (`* text=auto eol=lf`). |
 | Boundaries | dependency-cruiser. |
 | Updates | Dependabot weekly; `pnpm audit --prod` in CI. |

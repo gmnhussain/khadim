@@ -10,6 +10,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
     "esModuleInterop": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
