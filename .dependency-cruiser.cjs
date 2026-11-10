@@ -41,13 +41,22 @@ module.exports = {
       to: { path: "^packages/integrations/" },
     },
     {
-      name: "core-vendor-free",
-      comment: "Core never imports vendor SDKs or transport libraries.",
+      name: "core-allowed-packages-only",
+      comment:
+        "Core imports only allowlisted packages: zod, and drizzle-orm for repositories (ADR-0012). Workspace packages and Node built-ins are allowed. Extend the list only through an approved plan.",
       severity: "error",
       from: { path: "^packages/core/" },
       to: {
-        path: "node_modules/(@anthropic-ai|openai|@google/genai|@google/generative-ai|ollama|ai|@ai-sdk|voyageai|bullmq|ioredis|express|next|react|axios)(/|$)",
+        path: "node_modules/",
+        pathNot: "node_modules/(zod|drizzle-orm)(/|$)",
       },
+    },
+    {
+      name: "no-unresolvable",
+      comment: "Every import resolves; an unresolved import could also slip past the allowlist.",
+      severity: "error",
+      from: { path: "^(apps|packages)/" },
+      to: { couldNotResolve: true },
     },
     {
       name: "integrations-only-core-ports",

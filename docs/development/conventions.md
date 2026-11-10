@@ -200,7 +200,8 @@ Each module exposes its public API through `index.ts`; other modules import only
 | apps → packages, never the reverse; no app imports another app | Packages are shared; apps are deployables. |
 | Only `api` and `worker` import `core`, `integrations`, `db`; the one exception is `web` importing `@khadim/db/auth` in server-only code (ADR-0007) | The browser never gets server code. |
 | `web` reaches the API only through `contracts` | One typed client. |
-| `core` imports only `db`, `contracts` (schemas only) and its own modules | Core stays vendor-free and testable. |
+| `core` imports only `db`, `contracts` (schemas only), its own modules, Node built-ins and an **allowlist** of packages: `zod`, and `drizzle-orm` for repositories (ADR-0012). Anything else needs an approved plan that extends the list. | Core stays vendor-free and testable; an allowlist catches new SDKs a blocklist would miss. |
+| Every import resolves | An unresolved import could slip past the allowlist. |
 | `integrations` imports `core` ports, never `core` services | Adapters implement interfaces; they hold no business rules. |
 | Modules import each other only through `index.ts`; no cycles | Clear module boundaries. |
 
