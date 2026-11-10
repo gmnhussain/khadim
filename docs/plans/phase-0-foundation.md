@@ -22,7 +22,7 @@ Not in scope: any feature code, routes, tables, stubs or app shells (conventions
 | Apps and feature packages | `README.md` each, stating purpose and phase |
 | `infra` | Docker Compose: PostgreSQL 18 + pgvector, Redis; `.env.example` |
 | CI | GitHub Actions workflow, Dependabot, pull request template |
-| Docs | PRD, glossary, business rules, architecture (overview, agent, data model, jobs), ADR-0001 to ADR-0008, setup, testing, security, operations |
+| Docs | PRD, glossary, business rules, architecture (overview, agent, data model, jobs), ADR-0001 to ADR-0009, setup, testing, security, operations. The foundation review added ADR-0010 to ADR-0012 and `channels.md`. |
 
 ## Decisions
 
@@ -36,7 +36,7 @@ Not in scope: any feature code, routes, tables, stubs or app shells (conventions
 | D-6 | Mail catcher in local infra | Left out until email features exist | |
 | D-7 | `vector` extension setup | Created by the first migration, not by Docker init scripts | |
 | D-8 | Next.js ESLint preset and Tailwind Prettier plugin | Added with `apps/web` in Phase 1 | |
-| D-9 | Authentication library | Proposed: Better Auth (ADR-0007) | Needed before Phase 1 |
+| D-9 | Authentication library | Better Auth, auth only at the edges (ADR-0007) | Accepted; private access until TOTP is in place |
 | D-10 | Embedding provider | Proposed: Voyage AI (ADR-0008) | Needed before Phase 2 |
 | D-11 | pnpm settings location | `pnpm-workspace.yaml` (`engineStrict`), no `.npmrc` | |
 

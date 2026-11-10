@@ -551,7 +551,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - 12-factor: all config from env, validated with Zod at startup; `.env.example` per app with comments; `TZ=UTC` in every process.
 - Environments: `local` (seed data), `test` (containers in CI), `production`. Add `staging` when there is a second person or a risky migration.
 - Local infrastructure with Docker Compose on non-default ports, bound to localhost: PostgreSQL 18 + pgvector and Redis. A mail catcher is added when email features arrive.
-- **CI gates on every PR:** frozen install → typecheck → lint and format → unit tests with coverage → integration tests → migration check → depcruise → build → OpenAPI check → audit → commitlint → e2e.
+- **CI gates on every PR**, in the order `.github/workflows/ci.yml` runs them: frozen install → commitlint (pull requests) → format → lint → typecheck → unit and integration tests → depcruise → build → production audit. Each phase adds the gates it makes possible, in this order: coverage thresholds with the tests, migration check after build, OpenAPI check after build, e2e last.
 - Deployment: one Docker image per app (multi-stage); only the reverse proxy is public; migrations run once before new containers start; daily database backups with a tested restore.
 
 ---

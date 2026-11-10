@@ -16,7 +16,8 @@ khadim/
 │   └── worker/         BullMQ jobs and schedules (Phase 1)
 ├── packages/
 │   ├── core/           business and agent logic, ports
-│   ├── integrations/   Anthropic, embeddings, LinkedIn, Facebook adapters
+│   ├── integrations/   adapters: LLMs (Anthropic, OpenAI-compatible, …), embeddings,
+│   │                   LinkedIn, Facebook; later channels, notifications, MCP
 │   ├── db/             Drizzle schema and migrations
 │   ├── contracts/      shared Zod schemas, OpenAPI
 │   └── config/         TypeScript, ESLint, Prettier, Vitest presets, ports
