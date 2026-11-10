@@ -234,6 +234,7 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Editor | `.editorconfig` (UTF-8, LF, 2 spaces), `.gitattributes` (`* text=auto eol=lf`). |
 | Boundaries | dependency-cruiser. |
 | Updates | Dependabot weekly; `pnpm audit --prod` in CI. |
+| CI supply chain | GitHub Actions pinned to full commit SHAs with the version in a trailing comment; container images pinned by digest; Dependabot updates both. |
 
 Root scripts: `dev`, `build`, `lint`, `typecheck`, `format`, `test`, `test:unit`, `test:integration`, `test:e2e`, `evals`, `depcruise`, `openapi:check`, and `db:generate | db:migrate | db:seed` on `@khadim/db`. Workspace packages use the `@khadim/*` scope. Scripts are added in the phase that introduces what they run.
 
