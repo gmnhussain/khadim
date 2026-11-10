@@ -12,7 +12,7 @@
 | `social` | `social.process-webhook` | `social.webhook.<webhookEventId>` | Stored webhook event | 5 |
 | `memory` | `memory.ingest-document` | `memory.ingest.<documentId>.<version>` | Document uploaded | 2 |
 | `maintenance` | `maintenance.relay-outbox` | repeatable | Every few seconds | 1 |
-| `maintenance` | `maintenance.refresh-tokens` | repeatable | Daily | 3 |
+| `maintenance` | `maintenance.check-connection-expiry` | repeatable | Daily | 3 |
 | `maintenance` | `maintenance.expire-pending-actions` | repeatable | Every 15 minutes | 3 |
 | `maintenance` | `maintenance.purge-idempotency-keys` | repeatable | Daily | 1 |
 

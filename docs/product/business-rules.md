@@ -48,6 +48,7 @@ Numbering leaves gaps so related rules stay together: 01–09 access and approva
 | BR-43 | At most a limited number of posts are published per platform per day. > **Default:** 3. |
 | BR-44 | LinkedIn posts go to the owner's personal profile. LinkedIn comment reading is unsupported until the platform grants the permission. |
 | BR-45 | Facebook posts go only to a Page the owner administers, never a personal profile. |
+| BR-46 | Platform tokens are never refreshed silently unless the platform grants programmatic refresh. Before a connection expires, the owner is warned and asked to reconnect; an expired or revoked connection blocks publishing to that platform until the owner reconnects. Pending actions for it stay pending and still expire under BR-05. > **Default:** first warning 7 days before expiry, then daily. |
 
 ## Schedules
 

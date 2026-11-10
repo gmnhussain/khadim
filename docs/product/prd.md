@@ -45,7 +45,7 @@ A software developer wants a steady, authentic professional presence on LinkedIn
 | 0 | Docs foundation and monorepo scaffold | — |
 | 1 | Agent core: owner sign-in, run lifecycle, tool registry, tool-calling loop, streaming chat UI, run inspection, cost tracking; provider-neutral LLM port with Anthropic and OpenAI-compatible adapters, routing by task | BR-01, BR-20–BR-27 |
 | 2 | Memory: profile, document ingestion, retrieval, cited answers; post drafts in chat (not published); first evals; model choice per chat message and fallbacks | BR-30–BR-34 |
-| 3 | LinkedIn: OAuth connection, adapter, pending actions and approval, publishing job | BR-02–BR-06, BR-40–BR-44 |
+| 3 | LinkedIn: OAuth connection, adapter, pending actions and approval, publishing job | BR-02–BR-06, BR-40–BR-44, BR-46 |
 | 4 | Schedules: create and manage schedules; scheduled drafts and approval notifications | BR-50–BR-53 |
 | 5 | Facebook Page: connection, adapter, comment webhooks, reply drafts | BR-45, BR-60–BR-64 |
 | 6 | More tools and channels (web search, email, calendar, Telegram, voice, MCP) and native OpenAI and Gemini adapters, each with its own plan | — |

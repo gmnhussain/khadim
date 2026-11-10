@@ -64,7 +64,7 @@
 | Topic | Rule |
 | --- | --- |
 | Model | Trunk-based: short-lived branches from `main`, merged by pull request. |
-| Branch | `<type>/<kebab-description>`: `feat/linkedin-publishing`, `fix/token-refresh`. |
+| Branch | `<type>/<kebab-description>`: `feat/linkedin-publishing`, `fix/connection-expiry`. |
 | Commits | Conventional Commits checked by commitlint: `feat(social): add linkedin adapter (BR-10)`. Scope = module. Imperative subject, no period, ≤ 72 characters; body explains why for non-trivial commits. |
 | Size | One commit per meaningful step. Every commit builds and passes tests. |
 | Vertical slice | One branch carries schema → contracts → core → API/worker → web → tests → docs for one feature. |
@@ -175,7 +175,7 @@ packages/core/src/
   schedules/
     schedule.service.ts  schedule.repository.ts
   connections/
-    connection.service.ts       OAuth connections; token encryption and refresh
+    connection.service.ts       OAuth connections; token encryption, expiry tracking, reconnect
   shared/
     errors.ts  request-context.ts  outbox.ts  audit.ts  crypto.ts
 ```
@@ -463,7 +463,8 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 
 - `SocialPlatform` port: `publish`, `listNewComments`, `reply`, plus `capabilities` (`maxChars`, `supportsComments`, `supportsImages`, …). One adapter per platform in `integrations`; a registry maps platform keys to adapters.
 - Capabilities drive behaviour: unsupported actions return `PLATFORM_CAPABILITY_UNSUPPORTED`; limits are validated before a pending action is created, so the model can revise the draft.
-- **LinkedIn (primary):** personal-profile posting through the self-serve posting permission. Reading comments on personal posts needs a restricted permission, so the adapter starts with `supportsComments: false`. Tokens expire; a scheduled job refreshes them and alerts the owner before a reconnect is needed.
+- **LinkedIn (primary):** personal-profile posting through the self-serve posting permission. Reading comments on personal posts needs a restricted permission, so the adapter starts with `supportsComments: false`. Self-serve apps get access tokens that expire (60 days) and no programmatic refresh token (those are for approved partners only), so Khadim never refreshes silently: a daily job warns the owner before expiry and the owner reconnects through OAuth (BR-46).
+- **Token expiry in general:** a connection records its token expiry when known. Long-lived Facebook Page tokens usually have none but can still be revoked, so publishing checks the connection status first and fails with `PLATFORM_NOT_CONNECTED` before calling the platform.
 - **Facebook (extensibility test):** a Page the owner administers, never a personal profile. Comments arrive by verified webhook → raw `webhook_events` → processed into `comments` → a reply-draft run.
 - Publishing and replying always run in the worker, with idempotency by pending-action id; a stored platform post id prevents double publishing.
 - No scraping or browser automation against platform terms.
@@ -504,7 +505,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 | Unit | Vitest | `*.rules.ts` (100% coverage), loop logic with a **fake `LlmProvider`** that returns scripted responses, tool input validation, adapters' mapping functions |
 | Integration | Vitest + Supertest + Testcontainers (PostgreSQL 18 + pgvector, Redis) | API routes, services, repositories, migrations, jobs, webhook verification |
 | Contract | Vitest | constants vs DB enums, job payload schemas, OpenAPI up to date |
-| Adapter | Vitest with recorded HTTP fixtures (nock or MSW) | LinkedIn and Facebook request/response mapping, error mapping, token refresh |
+| Adapter | Vitest with recorded HTTP fixtures (nock or MSW) | LinkedIn and Facebook request/response mapping, error mapping, expired and revoked tokens |
 | Adapter contract | One shared Vitest suite run against every LLM and embedding adapter, with recorded fixtures | Message and tool mapping, streaming events, usage, error codes; required to add a provider |
 | End-to-end | Playwright on production builds | chat, approve-and-publish (with a fake platform adapter), schedule creation |
 | Evals | `evals/` runner | agent quality (§15.10) |
