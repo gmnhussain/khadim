@@ -23,7 +23,10 @@
 | Adapter contract suite | `adapterContract` | Shared tests every LLM and embedding adapter must pass. |
 | Tool | `ToolDefinition` | A capability the model may call, with a name, description, input schema and handler. |
 | Tool call | `ToolCall`, `tool_calls` | One execution of a tool requested by the model. |
-| Write tool | `isWrite: true` | A tool whose effect leaves Khadim; it never acts directly but creates a pending action. |
+| Effect tier | `effect` | What a tool changes: `read` (nothing), `local_write` (Khadim's own state), `external` (something outside Khadim). |
+| Tool policy | `ToolPolicy` | How a tool call executes: `auto` (now), `propose` (stored for the owner to accept later), `approve` (pending action; the run pauses). `external` tools are always `approve`. |
+| Write tool | — | Older term for a tool whose policy is `approve`; prefer "effect tier" and "tool policy". |
+| Proposal | `proposed` status | A `local_write` effect stored for the owner to accept later, without pausing the run (for example a learned memory fact). |
 | Pending action | `PendingAction`, `pending_actions` | A proposed external side effect with its exact payload, awaiting the owner's decision. |
 | Approval | `approve` | The owner accepting a pending action, optionally after editing it, which queues its execution. |
 | Rejection | `reject` | The owner declining a pending action; it never executes. |

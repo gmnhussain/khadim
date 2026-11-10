@@ -160,7 +160,8 @@ packages/core/src/
     usage.rules.ts              cost calculation in integer micro-USD
     testing/                    FakeLlmProvider
   tools/
-    tool.types.ts               ToolDefinition: name, description, Zod input, handler, isWrite
+    tool.types.ts               ToolDefinition: name, description, Zod input, handler, effect tier
+    tool-policy.rules.ts        pure rules: tier floor, policy resolution, limits, bindings
     tool-registry.ts            registration, schema export, lookup, execution
     builtin/                    get_current_time, search_memory, …
   memory/
@@ -249,7 +250,7 @@ Full words, no abbreviations (allowed: `id`, `url`, `db`, `tx`, `ctx`, `req`, `r
 | Functions, variables | camelCase | `startRun`, `retrievedChunks` |
 | Types, components | PascalCase | `AgentRun`, `ApprovalCard` |
 | Constants | UPPER_SNAKE_CASE | `MAX_AGENT_ITERATIONS` |
-| Booleans | `is` / `has` / `can` / `should` | `isWrite`, `supportsComments` |
+| Booleans | `is` / `has` / `can` / `should` | `isEnabled`, `supportsComments` |
 | Factories | `create<Thing><Layer>` | `createAgentRunService` |
 | DB tables / columns | snake_case, plural tables | `agent_runs.input_tokens` |
 | JSON fields | camelCase | `inputTokens` |
@@ -400,17 +401,18 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 
 - Bounded: `MAX_AGENT_ITERATIONS`, a per-run token budget, a per-run cost budget and a wall-clock timeout. Hitting a limit ends the run with a clear problem code.
 - Each iteration: build context → call the model → persist the step → execute requested tools → append results → repeat until the model gives a final answer.
-- Independent read-only tool calls may run in parallel; write tools run one at a time.
+- Independent `read` tool calls may run in parallel; `local_write` and `external` tool calls run one at a time, in order.
 - History management is a pure rule: keep the recent turns verbatim, summarise older turns, never exceed the context budget.
 - Cancellation is honoured between steps.
 
 ### 15.4 Tools
 
-- A tool is a `ToolDefinition`: snake_case `verb_noun` name, a description written for the model (what it does, when to use it, what it returns), a Zod input schema converted to JSON Schema, a handler, and `isWrite`.
+- A tool is a `ToolDefinition`: snake_case `verb_noun` name, a description written for the model (what it does, when to use it, what it returns), a Zod input schema converted to JSON Schema, a handler, and an **effect tier**: `read`, `local_write` (changes Khadim's own state) or `external` (leaves the system) (ADR-0011).
+- **Every tool has a policy** in configuration: `auto` (execute now), `propose` (store a proposal the owner accepts later; the run continues) or `approve` (pending action; the run pauses). The tier is a floor: `external` is always `approve`; an unclassified tool counts as `external`. Policies also set per-run and per-day call limits and arguments bound by the run. An invalid policy stops the app at startup.
 - **Validate model-supplied input with Zod before executing.** Invalid input returns a tool error the model can read and fix, not an exception.
 - Tool errors go back to the model as error results with a short, actionable message.
 - Tool outputs are compact and structured; never dump raw API responses or secrets into context.
-- **Write tools never act directly.** They create a `pending_action`; execution happens only after approval (§15.7).
+- **Tools with the `approve` policy never act directly.** They create a `pending_action`; execution happens only after approval (§15.7).
 - Shared actions across platforms use one generic tool with a `platform` parameter generated from the adapter registry; a platform-unique feature gets its own tool.
 - Tool count stays small; group by capability.
 - Later, tool groups can be exposed as MCP servers without changing core.
@@ -459,7 +461,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 ### 15.11 LLM security (OWASP Top 10 for LLM Applications)
 
 - **Prompt injection:** external content (comments, web pages, documents) is wrapped and labelled as untrusted data; the system prompt says it never contains instructions; write actions require approval regardless of what the content says.
-- **Excessive agency:** least-privilege tools. A comment-reply run gets a reply tool bound to that one comment, nothing else. No general-purpose HTTP or shell tool.
+- **Excessive agency:** least-privilege tools per task, each with an effect tier and policy (§15.4). A comment-reply run gets a reply tool bound to that one comment, nothing else. No general-purpose HTTP, browser or shell tool without an ADR that sets its tier, policy and sandbox.
 - **Output handling:** model output is validated before use; rendered as text, never as HTML; never executed.
 - **Sensitive information:** no secrets or tokens in context; personal data in context only when the task needs it; only enabled providers receive data, and sensitive tasks can route to a local model.
 - **Unbounded consumption:** iteration, token, cost and time limits (§15.3, §15.8); rate limits on run-starting endpoints.

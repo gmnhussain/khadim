@@ -48,7 +48,7 @@ sequenceDiagram
     L-->>S: text and/or tool requests + usage
     S->>S: persist step, record llm_call, check budgets
     S->>T: execute requested tools (validated with Zod)
-    alt write tool
+    alt policy approve
       T->>A: create pending action
       A-->>T: pending action id
     end
@@ -66,7 +66,7 @@ sequenceDiagram
 Events (`text.delta`, `tool.called`, `approval.required`, …) go to the run's Redis Stream as they happen; the API relays them over SSE (ADR-0010).
 
 - **Limits** (BR-21): `MAX_AGENT_ITERATIONS`, per-run token and cost budgets, a wall-clock timeout. Each limit ends the run with its problem code (`RUN_ITERATION_LIMIT`, `RUN_BUDGET_EXCEEDED`).
-- **Parallelism:** independent read-only tools may run in parallel; write tools run one at a time.
+- **Parallelism:** independent `read` tools may run in parallel; `local_write` and `external` tools run one at a time.
 - **Errors:** invalid tool input or a failing tool returns an error result to the model so it can correct itself. Provider rate limits and overloads retry with backoff; other provider errors fail the run.
 - **Cancellation** is checked between steps.
 
@@ -85,14 +85,26 @@ Order matters for prompt caching: the stable prefix comes first and is cached.
 
 ## 4. Tools
 
-| Tool | Module | Write | Phase |
-| --- | --- | --- | --- |
-| `get_current_time` | tools/builtin | No | 1 |
-| `search_memory` | memory | No | 2 |
-| `get_post_history` | social | No | 2 |
-| `publish_post` (`platforms`, `text`, optional `media`) | social | Yes | 3 |
-| `list_new_comments` (`platform`, `postId`) | social | No | 5 |
-| `reply_to_comment` (bound to one comment per run, BR-64) | social | Yes | 5 |
+Every tool has an effect tier and a policy ([ADR-0011](../decisions/ADR-0011-tool-effect-tiers-and-policy.md)). The tier is a floor: `external` tools always need approval.
+
+| Tool | Module | Effect | Policy | Phase |
+| --- | --- | --- | --- | --- |
+| `get_current_time` | tools/builtin | `read` | `auto` | 1 |
+| `search_memory` | memory | `read` | `auto` | 2 |
+| `get_post_history` | social | `read` | `auto` | 2 |
+| `publish_post` (`platforms`, `text`, optional `media`) | social | `external` | `approve` | 3 |
+| `list_new_comments` (`platform`, `postId`) | social | `read` | `auto` | 5 |
+| `reply_to_comment` (bound to one comment per run, BR-64) | social | `external` | `approve` | 5 |
+
+```mermaid
+flowchart LR
+  call[Model requests a tool] --> valid{Input valid<br/>and within limits?}
+  valid -->|no| err[Tool error back to the model]
+  valid -->|yes| policy{Policy}
+  policy -->|auto| run[Execute now]
+  policy -->|propose| prop[Store proposal;<br/>run continues]
+  policy -->|approve| pa[Pending action;<br/>run pauses]
+```
 
 Tools per task (least privilege):
 

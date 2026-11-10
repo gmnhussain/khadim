@@ -33,7 +33,7 @@ See [conventions §1](../development/conventions.md#1-principles). The ones that
 - **Thin edges, rich core:** apps parse input and wire dependencies; all logic is in `packages/core`.
 - **Ports and adapters:** core defines `LlmProvider`, `Embedder` and `SocialPlatform`; `packages/integrations` implements them, one adapter per vendor.
 - **Configurable models:** which provider and model serve each task is configuration, not code (ADR-0009).
-- **Humans approve side effects:** write tools only create pending actions.
+- **Humans approve side effects:** every tool has an effect tier (`read`, `local_write`, `external`) and a policy; `external` tools only create pending actions (ADR-0011).
 - **One run model:** chat, schedules and webhooks all create the same agent run, executed in the worker, able to pause for approval and resume.
 
 ## Technology choices

@@ -28,7 +28,7 @@ Status: **Planned** until the phase that builds the control; then **Tested** wit
 | Risk (OWASP LLM Top 10) | Control | Proven by | Phase | Status |
 | --- | --- | --- | --- | --- |
 | Prompt injection | External content wrapped and labelled as untrusted; system prompt rule; approvals required regardless of content (BR-02, BR-62) | Eval cases with injection attempts in comments and documents | 2, 5 | Planned |
-| Excessive agency | Least-privilege tools per task; reply tool bound to one comment (BR-64); no general HTTP or shell tool | Unit tests of tool sets per task | 1, 5 | Planned |
+| Excessive agency | Least-privilege tools per task; effect tier and policy per tool, with `external` always needing approval (ADR-0011); reply tool bound to one comment (BR-64); no general HTTP, browser or shell tool without an ADR | Unit tests of tool sets per task and of the tier floor in `tool-policy.rules.ts`; startup test rejecting an `external` tool with `auto` | 1, 5 | Planned |
 | Improper output handling | Output validated with Zod; rendered as sanitised Markdown without raw HTML; never executed | Unit and e2e tests with HTML in model output | 1 | Planned |
 | Sensitive information disclosure | No secrets or tokens in context; only needed personal data | Unit test of context builder | 1 | Planned |
 | Data sent to third-party providers | Only enabled providers receive data (BR-27); sensitive tasks can route to a local model; one API key per provider, server-side only | Unit test of provider registry and routing rules | 1 | Planned |

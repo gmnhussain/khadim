@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Accepted |
+| Status | Accepted (extended by [ADR-0011](ADR-0011-tool-effect-tiers-and-policy.md): effect tiers and per-tool policy) |
 | Date | 2026-11-10 |
 
 ## Context
