@@ -76,10 +76,13 @@ importers:
         version: 5.9.3
 
   packages/config:
-    dependencies:
+    devDependencies:
       '@eslint/js':
         specifier: 'catalog:'
         version: 9.39.5
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.5(jiti@2.6.1)
       eslint-config-prettier:
         specifier: 'catalog:'
         version: 10.1.8(eslint@9.39.5(jiti@2.6.1))
@@ -92,19 +95,15 @@ importers:
       globals:
         specifier: 'catalog:'
         version: 16.5.0
-      typescript-eslint:
-        specifier: 'catalog:'
-        version: 8.72.2(eslint@9.39.5(jiti@2.6.1))(typescript@5.9.3)
-    devDependencies:
-      eslint:
-        specifier: 'catalog:'
-        version: 9.39.5(jiti@2.6.1)
       prettier:
         specifier: 'catalog:'
         version: 3.9.10
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      typescript-eslint:
+        specifier: 'catalog:'
+        version: 8.72.2(eslint@9.39.5(jiti@2.6.1))(typescript@5.9.3)
 
 packages:
 

@@ -17,18 +17,16 @@
   "scripts": {
     "lint": "eslint . --max-warnings 0"
   },
-  "dependencies": {
+  "devDependencies": {
     "@eslint/js": "catalog:",
+    "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
     "eslint-plugin-import-x": "catalog:",
     "globals": "catalog:",
-    "typescript-eslint": "catalog:"
-  },
-  "devDependencies": {
-    "eslint": "catalog:",
     "prettier": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
   },
   "peerDependencies": {
     "eslint": "catalog:",

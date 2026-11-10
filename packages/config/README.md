@@ -13,6 +13,10 @@
 | `@khadim/config/vitest` | `vitestBaseConfig`, merged in each workspace's `vitest.config.ts` |
 | `@khadim/config/ports` | `PORTS` constants for local development |
 
+## Dependencies
+
+Every dependency of this package is a `devDependency`: it is build and lint tooling, never shipped code. Workspaces add `@khadim/config` as a `devDependency` too, so `pnpm audit --prod` audits only what runs in production and stays strict.
+
 ## Added later
 
 - A Next.js tsconfig and an ESLint preset with React, React Hooks and Next rules, together with `apps/web` (Phase 1).
