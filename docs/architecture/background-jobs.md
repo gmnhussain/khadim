@@ -7,7 +7,7 @@
 | Queue | Job | Job id | Triggered by | Phase |
 | --- | --- | --- | --- | --- |
 | `agent` | `agent.run` | `agent.run.<agentRunId>` | Chat message (enqueued directly, outbox as backstop), schedule firing, processed webhook event | 1 |
-| `agent` | `agent.resume-run` | `agent.resume.<agentRunId>.<stepIndex>` | Every pending action from a paused step resolved | 3 |
+| `agent` | `agent.resume-run` | `agent.resume.<agentRunId>.<stepIndex>` | Last pending action of a paused step resolved (outbox, may also be enqueued directly; ADR-0013) | 3 |
 | `social` | `social.publish-post` | `social.publish.<pendingActionId>` | Approved pending action (outbox) | 3 |
 | `social` | `social.reply-comment` | `social.reply.<pendingActionId>` | Approved pending action (outbox) | 5 |
 | `social` | `social.process-webhook` | `social.webhook.<webhookEventId>` | Stored webhook event | 5 |
@@ -17,6 +17,7 @@
 | `maintenance` | `maintenance.check-connection-expiry` | repeatable | Daily | 3 |
 | `maintenance` | `maintenance.expire-pending-actions` | repeatable | Every 15 minutes | 3 |
 | `maintenance` | `maintenance.purge-idempotency-keys` | repeatable | Daily | 1 |
+| `maintenance` | `maintenance.check-redis-memory` | repeatable | Every 5 minutes; notifies `redis_memory_high` past the threshold (ADR-0013) | 1 |
 
 ## Outbox flow
 
@@ -39,8 +40,13 @@ A crash between steps only causes a retry; deterministic job ids and idempotent 
 ## Run event streams
 
 - The worker appends each run's events to the Redis Stream `agent:run-events:v1:<agentRunId>`; the API relays it over SSE (ADR-0010).
-- Streams are transient: trimmed and expired after the run ends (> **Default:** 24 hours). The durable record is in PostgreSQL.
-- BullMQ queues and run event streams share the Redis instance, which uses `noeviction`, so neither loses entries under memory pressure.
+- Streams are transient and bounded (ADR-0013): `text.delta` entries are coalesced, every append caps the length, and a stream expires a while after its run pauses or ends. The durable record is in PostgreSQL.
+- BullMQ queues and run event streams share the Redis instance, which uses `noeviction`: nothing is evicted, but a full Redis rejects every write, BullMQ's included. The stream caps keep run memory bounded, and the owner is warned before memory runs out (ADR-0013).
+- Appending to a stream is best effort: a failed append never fails the run.
+
+## Resuming a paused run
+
+Every way of resolving a pending action (executed, failed, rejected, expired, cancelled) uses one core function and one transaction: lock the run row, record the outcome as the tool result, and, if it was the step's last unresolved pending action and the run is still `awaiting_approval`, write the `agent.resume-run` outbox event. The lock stops two concurrent resolutions from each missing the other (ADR-0013).
 
 ## Schedules
 

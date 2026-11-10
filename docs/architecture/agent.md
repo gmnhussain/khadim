@@ -23,7 +23,8 @@ stateDiagram-v2
 ```
 
 - **Pause:** once every tool call in a step is handled and the step created at least one pending action, the run moves to `awaiting_approval` and its job ends. No worker waits.
-- **Resume:** when each of that step's pending actions is executed, failed, rejected or expired, the outcomes become the tool results and an `agent.resume-run` job continues the loop. The model sees what happened ("published, post id …", "rejected by the owner").
+- **Resume:** when each of that step's pending actions is executed, failed, rejected or expired, the outcomes become the tool results and an `agent.resume-run` job continues the loop. The model sees what happened ("published, post id …", "rejected by the owner"). Resolutions lock the run row, and the resume is written to the outbox by whichever resolution was last, so it happens exactly once (ADR-0013).
+- **Events:** the SSE response closes when the run pauses or ends; the web app reopens it when the run is running again (ADR-0013).
 - **Budgets:** the wall-clock limit counts running time only; waiting is bounded by pending action expiry (BR-05).
 - **Interruption:** a stalled job is retried and resumes from the last persisted step.
 

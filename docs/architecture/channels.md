@@ -78,7 +78,7 @@ flowchart LR
 
 | Field | Meaning |
 | --- | --- |
-| `kind` | `approval_required`, `run_failed`, `budget_reached`, `connection_expiring`, `connection_expired`, `job_dead_lettered`, `memory_fact_proposed` |
+| `kind` | `approval_required`, `run_failed`, `budget_reached`, `connection_expiring`, `connection_expired`, `job_dead_lettered`, `memory_fact_proposed`, `redis_memory_high` |
 | `severity` | `info`, `warning`, `critical` |
 | `title`, `link` | Short text and a link into the web app |
 | `subject_type`, `subject_id` | What it is about (run, pending action, connection, …) |

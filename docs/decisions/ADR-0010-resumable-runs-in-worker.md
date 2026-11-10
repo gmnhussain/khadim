@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Accepted |
+| Status | Accepted (extended by ADR-0013) |
 | Date | 2026-11-10 |
 | Relates to | Supersedes ADR-0004 (chat runs in the API); extends ADR-0006 (approvals) |
 
