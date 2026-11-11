@@ -61,5 +61,5 @@
 | Outbox event | `OutboxEvent`, `outbox_events` | A record written with a state change so a job is enqueued reliably. |
 | Prompt version | `promptVersion` | The versioned prompt file a run used, such as `post-writer.v2`. |
 | Budget | `runBudget`, `dailyBudget` | Limits on tokens, cost and iterations for a run or a day. |
-| Eval case | `G-xx` | A test input with expected properties for measuring agent quality. |
+| Eval case | `E-xx` | A test input with expected properties for measuring agent quality. |
 | Untrusted content | `untrusted` | Text from outside Khadim (comments, web pages, documents) treated as data, never instructions. |

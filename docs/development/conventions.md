@@ -108,7 +108,7 @@ docs/
 - Each fact has one home; other docs link to it.
 - Open each doc with one bold summary sentence; rules as bullets, mappings as tables, flows as Mermaid.
 - Unknowns: `> **Open question:** …`. Chosen-for-now answers: `> **Default:** …`.
-- Ids: `BR-xx` business rule, `D-xx` plan decision, `P-xx` pitfall, `G-xx` golden or eval case, `ADR-NNNN` decision.
+- Ids: `BR-xx` business rule, `D-xx` plan decision, `P-xx` pitfall, `E-xx` eval case (`G-n` is a PRD goal), `ADR-NNNN` decision.
 - Hard-to-reverse choices get an ADR (Status, Date, Context, Decision, Alternatives, Consequences). Never edit an accepted ADR except its status line; supersede or extend it with a new ADR.
 - A behaviour change and its doc change ship in the same PR.
 - Generated references (OpenAPI, changelog) are never hand-written.
@@ -364,7 +364,7 @@ PostgreSQL 18 with Drizzle ORM and the pgvector extension.
 | Timestamps | `created_at`, `updated_at` as `timestamptz` in UTC. |
 | Concurrency | `version integer` on editable rows. |
 | Status | Status columns, not booleans, for anything with a lifecycle; transitions enforced in rules and, for critical ones (`pending_actions`, `agent_runs`), by a trigger. |
-| Append-only | `agent_steps`, `llm_calls`, `tool_calls`, `audit_logs`, `webhook_events`, `outbox`, `notifications` are inserted, never updated (except delivery and read markers). |
+| Append-only | `agent_steps`, `llm_calls`, `tool_calls`, `audit_logs`, `webhook_events`, `outbox_events`, `notifications` are inserted, never updated (except delivery and read markers). |
 | Deletion | Business history (posts, runs, approvals) is never hard-deleted. Memory documents may be deleted by the owner (their chunks and embeddings go with them). |
 | Money | LLM cost stored as `bigint` micro-USD, never floats. |
 | Embeddings | `vector(<dimensions>)` column plus the embedding `provider`, `model` and `dimensions` on every chunk, so re-indexing with a new model is possible; HNSW index. |
@@ -399,7 +399,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 ### 15.1 Run lifecycle
 
 - Every trigger (chat message, schedule, webhook) creates an `agent_run` with `trigger_type`, `trigger_ref`, `task`, `model`, and `prompt_version`. The loop never knows who triggered it.
-- States, enforced as a state machine: `queued → running`; `running ⇄ awaiting_approval`; `running → succeeded | failed | cancelled`; `queued → cancelled`; `awaiting_approval → cancelled`. A paused run never ends directly as `succeeded` or `failed`: it resumes first (ADR-0010).
+- Run status is enforced as a state machine; the states and transitions live in [agent design §1](../architecture/agent.md#1-run-lifecycle). A paused run never ends directly as `succeeded` or `failed`: it resumes first (ADR-0010).
 - The wall-clock budget counts **running time only**, measured from when the run last entered `running` plus the running time it used before pausing. A run left in `running` past that budget is marked `failed`. A run in `awaiting_approval` is bounded by pending action expiry (BR-05), never by this timeout.
 - **Every run executes in the worker**, whatever triggered it, through the same `runAgent()` in core; the API only relays events (§11, ADR-0010).
 - **Runs are resumable:** a step that creates pending actions pauses the run (`awaiting_approval`, no worker held); when they are all resolved, their outcomes become tool results and the run resumes from persisted history. A stalled job resumes from the last persisted step.
@@ -476,7 +476,7 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 
 ### 15.10 Evaluations
 
-- Agent quality is tested, not assumed. `evals/` holds datasets of cases (`G-xx`) with inputs and expected properties.
+- Agent quality is tested, not assumed. `evals/` holds datasets of cases (`E-xx`) with inputs and expected properties.
 - Graders: deterministic checks first (length within platform limit, required hashtags, no forbidden phrases, correct tool chosen, valid JSON), then a model-graded rubric (relevance to profile, tone, factual grounding in memory) for what code cannot check.
 - Evals run on demand and on every prompt or model change; results are stored and compared with the previous baseline. They call real models, so they are not part of the normal unit test run.
 - Evals can run the same cases across several routed models to compare quality and cost side by side.

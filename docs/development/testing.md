@@ -45,7 +45,7 @@ Fakes live next to their port in `packages/core` under a `testing/` folder and a
 
 ## Evals
 
-- Cases (`G-xx`) hold an input and expected properties, for example "post under 3,000 characters, mentions only skills from the profile, no hashtags from the blocked list".
+- Cases (`E-xx`) hold an input and expected properties, for example "post under 3,000 characters, mentions only skills from the profile, no hashtags from the blocked list".
 - Deterministic graders run first; a model-graded rubric covers tone, relevance and grounding.
 - Results are stored and compared with the previous baseline in the PR description.
 - The same cases can run across several models to compare quality and cost per provider.

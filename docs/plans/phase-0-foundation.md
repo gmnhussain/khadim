@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| Status | Done, awaiting owner review |
+| Status | Done |
 | Phase | 0 |
 
 ## Goal and scope

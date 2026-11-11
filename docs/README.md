@@ -28,4 +28,4 @@
 - Each fact has one home; others link to it.
 - Every doc opens with one bold summary sentence.
 - Unknowns are marked `> **Open question:**`; chosen-for-now answers `> **Default:**`.
-- Ids: `BR-xx` business rule, `D-xx` plan decision, `P-xx` pitfall, `G-xx` eval case, `ADR-NNNN` decision.
+- Ids: `BR-xx` business rule, `D-xx` plan decision, `P-xx` pitfall, `E-xx` eval case, `G-n` PRD goal, `ADR-NNNN` decision.

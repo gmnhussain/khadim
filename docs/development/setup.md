@@ -41,14 +41,7 @@ All must pass with zero warnings before a change is ready (conventions §22).
 
 ## Local ports
 
-| Service | Port |
-| --- | --- |
-| Web | 3100 |
-| API | 4100 |
-| PostgreSQL | 55432 |
-| Redis | 56379 |
-
-The single source is `@khadim/config/ports`; `infra/docker-compose.yml` and each app's `.env.example` use the same values. Apps read their port from the environment, never from `@khadim/config` at runtime.
+The port table is in the [README](../../README.md#local-ports). The single source is `@khadim/config/ports`; `infra/docker-compose.yml` and each app's `.env.example` use the same values. Apps read their port from the environment, never from `@khadim/config` at runtime.
 
 ## Environment variables
 

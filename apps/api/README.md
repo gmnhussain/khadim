@@ -5,6 +5,6 @@
 - Layers: routes → controllers → services (in `@khadim/core`) → repositories (conventions §10).
 - Accepts only BFF requests with a valid service token, and platform webhooks with valid signatures; never public (ADR-0007).
 - Errors as RFC 9457 problem details; `Idempotency-Key` on run-starting and publishing POSTs (§11, §12).
-- Local port: `4100`.
+- Local port: see [README](../../README.md#local-ports).
 
 Not built yet: this folder holds only this README until its phase (conventions §2.3).

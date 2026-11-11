@@ -2,10 +2,12 @@
 
 **Local infrastructure for development: PostgreSQL 18 with pgvector, and Redis for BullMQ.**
 
-| Service | Image | Local address |
-| --- | --- | --- |
-| PostgreSQL + pgvector | `pgvector/pgvector:pg18` | `127.0.0.1:55432` |
-| Redis | `redis:8-alpine` | `127.0.0.1:56379` |
+| Service | Image |
+| --- | --- |
+| PostgreSQL + pgvector | `pgvector/pgvector:pg18` |
+| Redis | `redis:8-alpine` |
+
+Ports are listed in the [README](../README.md#local-ports).
 
 ```bash
 cp infra/.env.example infra/.env   # then change POSTGRES_PASSWORD

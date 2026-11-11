@@ -4,8 +4,8 @@
 
 | Plan | Status |
 | --- | --- |
-| [phase-0-foundation.md](phase-0-foundation.md) | Done, awaiting owner review |
-| `phase-1-agent-core.md` | Next |
+| [phase-0-foundation.md](phase-0-foundation.md) | Done |
+| [phase-1-agent-core.md](phase-1-agent-core.md) | Approved; slice 1a next |
 
 ## Template
 
