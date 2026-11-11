@@ -4,6 +4,8 @@
 
 ## Queues and jobs
 
+Each job is defined once in `packages/core/src/shared/jobs/`: queue, name, Zod payload schema and job-id builder, validated on enqueue and on consume (conventions §17). The API enqueues and the worker consumes from the same definition; a separate package is added only if something outside core needs it.
+
 | Queue | Job | Job id | Triggered by | Phase |
 | --- | --- | --- | --- | --- |
 | `agent` | `agent.run` | `agent.run.<agentRunId>` | Chat message (enqueued directly, outbox as backstop), schedule firing, processed webhook event | 1 |

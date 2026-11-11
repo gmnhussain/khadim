@@ -1,6 +1,6 @@
 # Architecture decision records
 
-**Hard-to-reverse choices and why they were made. Accepted ADRs are never edited except their status line; a new ADR supersedes or extends them.**
+**Hard-to-reverse choices and why they were made. Accepted ADRs are never rewritten: a small clarification is a dated amendment section at the end, noted on the status line; a changed decision is a new ADR that supersedes or extends them (conventions §4.2).**
 
 | ADR | Title | Status |
 | --- | --- | --- |
@@ -18,19 +18,46 @@
 | [0012](ADR-0012-repositories-in-core-with-drizzle.md) | Repositories live in core and use Drizzle directly | Accepted |
 | [0013](ADR-0013-serialized-resume-and-bounded-run-streams.md) | Serialized, outbox-backed resume and bounded run event streams | Accepted |
 | [0014](ADR-0014-unclassified-tools-are-never-offered.md) | Unclassified tools are never offered to the model | Accepted |
-| [0015](ADR-0015-private-mode-fails-closed.md) | `private` access mode fails closed | Accepted (amendment proposed in ADR-0016) |
-| [0016](ADR-0016-loopback-gate-only-without-proxy.md) | The `loopback` gate is only for unproxied local use | Proposed |
+| [0015](ADR-0015-private-mode-fails-closed.md) | `private` access mode fails closed | Accepted (extended by ADR-0016) |
+| [0016](ADR-0016-loopback-gate-only-without-proxy.md) | The `loopback` gate is only for unproxied local use | Accepted |
 
 ## Template
+
+For new ADRs. Accepted ADRs keep the shape they were accepted with.
 
 ```markdown
 # ADR-NNNN: <Title>
 
-| Status | Proposed / Accepted / Superseded by ADR-NNNN |
+| | |
+| --- | --- |
+| Status | Proposed / Accepted / Superseded by ADR-NNNN / Extended by ADR-NNNN |
 | Date | YYYY-MM-DD |
+| Relates to | ADR-NNNN (extends, supersedes or depends on) |
 
 ## Context
+
+<The forces at play in a few short paragraphs: what changed, what hurts.>
+
 ## Decision
+
+1. **<Rule in bold.>** <One or two sentences.>
+2. …
+
 ## Alternatives considered
+
+| Option | Why not |
+| --- | --- |
+| <option> | <reason> |
+
 ## Consequences
+
+- <What becomes easier, what becomes harder, what must now be done.>
+
+## Related
+
+- [<doc>](../<path>.md)
+
+## Amendments
+
+<Only after acceptance, newest last: `### YYYY-MM-DD: <title>` and the clarification. A changed decision is a new ADR instead.>
 ```

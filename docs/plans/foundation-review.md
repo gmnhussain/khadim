@@ -162,12 +162,13 @@ Written into the named plan, approved with it, and built with the code that need
 | Frontend standard: `server-only`, no `NEXT_PUBLIC_*` in the BFF, cheap `proxy.ts`, `FormFailure` and `useFormAction`, out-of-order guards, `*.client.ts` storage helpers, `docs/design/` | 1b |
 | Code templates (contract, table, repository, service, controller, routes, tests) and an implementer prompt, from the first database-backed module | 1b |
 | Scoped rule files `.claude/rules/api`, `database`, `ui` | 1b |
+| How the web app reads the socket peer address in the installed Next.js version, before the `loopback` and `tailscale` gates are built; an alternative if it cannot be read reliably (ADR-0016) | 1b |
 | Job definitions (`defineJob` with Zod payloads and tests) in `core/src/shared/jobs` | 1b |
 | API HTTP helpers: problem, domain problem, idempotent response, versioned response, `Location`, page response, client details, CSRF origin middleware | 1b |
 | Test-database helpers: Testcontainers with the real roles script, migrations apply cleanly and are idempotent, upgrade tests against a database with rows; integration tests refuse a database whose name lacks `test` | 1b |
 | CI split into parallel jobs (checks, integration, migrations, audit, commits; e2e later); coverage gate; migration drift check; caches for `.turbo` and `.next/cache` | 1b |
 | Web patterns: form failure mapping, a tested `proxy.ts`, `instrumentation.ts`, `server-env.ts` | 1b |
-| ADR-0017, owner account protection, written against the Better Auth version installed then: recovery codes, session list and revoke, sign-in protection per D-12, step-up per D-10, CSRF `Origin` check and Server Actions `allowedOrigins`, secret rotation, `trust proxy` CIDRs, Permissions-Policy, COOP and CORP, upload checks by magic bytes and size, redirect and OAuth callback allowlist, rate limiters (sign-in fails closed; others fail open) | 1d |
+| ADR-0017, owner account protection, written against the Better Auth version installed then: recovery codes, session list and revoke, sign-in protection per D-12 (confirm the installed Better Auth can count wrong TOTP codes toward the throttle, or propose an alternative; throttle by the trusted client address, never by the proxy's), step-up per D-10, CSRF `Origin` check and Server Actions `allowedOrigins`, secret rotation, `trust proxy` CIDRs, Permissions-Policy, COOP and CORP, upload checks by magic bytes and size, redirect and OAuth callback allowlist, rate limiters (sign-in fails closed; others fail open) | 1d |
 | e2e: own servers, user and client address per test, failure on CSP violations and console errors, locating by role and label; specs for security headers, session renewal, two tabs | 1d |
 | Hybrid search (full-text and vector) for memory retrieval (D-7) | 2 |
 | Release pipeline: images built once and tagged with the commit, SBOM, provenance, vulnerability scan, staging then production behind approval, health check after deploy | 3 |

@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Proposed (owner decision needed before Phase 1b) |
+| Status | Accepted, 2026-11-11 (foundation-review plan D-1) |
 | Date | 2026-11-11 |
 | Relates to | Extends ADR-0015 (`private` access mode fails closed) |
 

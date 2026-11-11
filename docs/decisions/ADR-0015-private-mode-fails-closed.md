@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Accepted (amendment proposed in [ADR-0016](ADR-0016-loopback-gate-only-without-proxy.md): `loopback` is not the gate behind a same-host proxy) |
+| Status | Accepted (extended by [ADR-0016](ADR-0016-loopback-gate-only-without-proxy.md): `loopback` is not the gate behind a same-host proxy, so `tailscale serve` and `cloudflared` are no longer typical uses of it) |
 | Date | 2026-11-10 |
 | Relates to | Extends ADR-0007 (authentication, access modes) |
 
