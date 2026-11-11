@@ -9,6 +9,10 @@ import { configs as typescriptConfigs } from "typescript-eslint";
 /** Names whose leading underscore marks them as intentionally unused (conventions §8). */
 const UNUSED_PATTERN = "^_";
 
+/** Files a workspace typechecks with its tsconfig.test.json instead of its tsconfig.json. */
+const TEST_PROJECT_FILES = ["**/*.test.ts", "vitest.config.ts"];
+const TEST_TSCONFIG = "./tsconfig.test.json";
+
 /** Paths no workspace ever lints. */
 const IGNORED_PATHS = [
   "**/node_modules/**",
@@ -88,6 +92,14 @@ export function createBaseConfig({ tsconfigRootDir }) {
       files: ["**/*.ts", "**/*.tsx"],
       // TypeScript reports unresolved imports more accurately.
       rules: { "import-x/no-unresolved": "off" },
+    },
+    {
+      // Test files and the Vitest config are outside tsconfig.json (conventions §6), so the
+      // project service cannot find them; they are linted with the project that typechecks them.
+      files: TEST_PROJECT_FILES,
+      languageOptions: {
+        parserOptions: { projectService: false, project: TEST_TSCONFIG, tsconfigRootDir },
+      },
     },
     {
       files: ["**/*.js", "**/*.mjs", "**/*.cjs"],

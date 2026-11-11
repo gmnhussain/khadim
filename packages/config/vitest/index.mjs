@@ -20,9 +20,6 @@ export const vitestBaseConfig = Object.freeze({
     environment: "node",
     restoreMocks: true,
     unstubEnvs: true,
-    // Only until Phase 1a's first tests exist: it would also hide a test glob that matches
-    // nothing. The 1a plan removes it (foundation-review slice 2).
-    passWithNoTests: true,
     coverage: {
       provider: "v8",
       include: ["src/**"],

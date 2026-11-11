@@ -60,6 +60,149 @@ Not in scope: database, Redis, apps, web UI, OpenAI-compatible adapter (1c), mem
 | tests | Unit tests per conventions §19.1; 100% coverage on `*.rules.ts`; loop scenarios with `FakeLlmProvider` (final answer, tool call, invalid tool input, iteration limit, cost limit, cancellation between steps, `approve` policy pausing the run, refusal ending the run; a stream that fails before emitting anything is retried; a stream that fails after only metadata (start, ping, usage) is retried; a stream that fails after emitting text, and one that fails after emitting a tool call, each fail the step without a retry; a cancel during a retry wait ends the run as cancelled without finishing the wait); price-tier boundary cases in `usage.rules`; `retry.rules` cases (`retryAfterMs` longer than the backoff is waited in full; `retryAfterMs` longer than the remaining running-time budget fails the run without waiting; non-retryable errors are not retried; no retry once `maxAttempts` is reached; a fixed random value gives the exact jittered delay); contract suite against the Anthropic fixtures, including `retryAfterMs` mapped from a rate-limit response and the SDK's retries being off |
 | docs | `docs/product/features/agent.md`, which also defines the agent, tool and LLM problem codes (conventions §12.1); agent design §7 updated for D-9: retries in core instead of at the adapter (diagram and text), the Retry-After rule, the mid-stream rule (what counts as emitted), `maxAttempts` and cancellation during a wait; ADR-0008 untouched (embeddings are Phase 2) |
 
+### Increments
+
+Drafted 2026-11-12; the owner answered the open questions marked below on 2026-11-12 and started increments 1 and 2. One commit per increment when the owner asks for it, except that increments 1 and 2 are one commit: a package with no source cannot pass the checks, and every commit builds and passes (conventions §3). Work stops after each gate for review; increments 1 and 2 share one gate, at the end of 2.
+
+**Gate, the same for every increment:** `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` (test count reported), `pnpm depcruise`, `pnpm build` and `pnpm audit --prod` all pass, with no check silenced or weakened and no real model call. The lockfile diff is read after every install (KP-04).
+
+Package APIs were checked against the published packages before this section was written: `@anthropic-ai/sdk` 1.3.0, `zod` 4.6.7, `vitest` 5.1.0 and `msw` 3.0.4. Neither the SDK nor Zod is installed in the repository yet.
+
+#### 1. Workspace setup
+
+- Scope: config · core.
+  - Catalog: add `@vitest/coverage-v8` 5.1.0, `msw` 3.0.4 and `vite` (`vitest` 5.1.0 is already there).
+  - `packages/core`: `package.json` (`@khadim/*` name, `exports` subpaths per conventions §5.4, scripts `lint`, `typecheck`, `test:unit`), `tsconfig.json` (node preset, test files excluded), `tsconfig.test.json` (test preset), `eslint.config.mjs`, `vitest.config.ts` (merges `vitestBaseConfig`).
+  - `.dependency-cruiser.cjs`: `core-allowed-packages-only` excludes test files and `vitest.config.ts` (changes by layer, boundaries row).
+  - The core README loses its "not built yet" line.
+- Copy from: `packages/config/README.md` (tsconfig and ESLint examples), `packages/config/eslint.config.mjs`, `packages/config/package.json` (catalog and devDependency style).
+- Tests: none of its own. Proof is the gate, plus `eslint --print-config` on one source and one test path (KP-01) and a lockfile diff that shows only the added packages (KP-03, KP-04).
+- Gate: shared with increment 2 (owner, 2026-11-12).
+
+> **Open question:** A package with no source cannot pass the gate: `tsc` fails on an empty `include`, and Vitest fails with no test files once `passWithNoTests` is removed. Core gets its first files in increment 2, integrations only in increment 6. Recommendation: review increments 1 and 2 together (one gate at the end of 2), and create the `packages/integrations` workspace files in increment 6.
+
+> **Owner answer (2026-11-12):** Agreed. Increments 1 and 2 are reviewed together, with one gate at the end of 2, and land as one commit, because every commit builds and passes (conventions §3); the owner corrected an earlier "two commits" the same day. The `packages/integrations` workspace files are created in increment 6.
+
+> **Open question:** Vitest 5 has `vite` as a required peer dependency (`^6.4.0 || ^7.0.0 || ^8.0.0`); the plan names only `vitest`, `@vitest/coverage-v8` and `msw`. Add `vite` to the catalog as an explicit devDependency (recommended, so its version is chosen here and commented), or let pnpm resolve the peer? Either way its version must clear `minimumReleaseAge`.
+
+> **Owner answer (2026-11-12):** Add `vite` to the catalog as an explicit devDependency, with a comment saying why: the newest version that Vitest 5.1.0 accepts and that clears `minimumReleaseAge`. If the install needs new release-age exclusions (KP-03), they are exact `name@version` lines with removal dates, and the lockfile diff is shown to the owner.
+
+> **Default:** `vite` 8.3.7. The newest release outside the window was 8.3.5, but GHSA-p4f5-76q4-ffq7 (critical, published 2026-11-10) affects 8.3.0 to 8.3.6 and is fixed in 8.3.7. The owner asked for the patched release (2026-11-12); `vite` 8.3.7 and the Rolldown 1.2.18 it requires carry security-patch exclusions that are removed after 2026-11-23 (conventions §6).
+
+> **Open question:** The changes-by-layer table gives every package a `test:integration` script, and removes `passWithNoTests` once tests exist. 1a has no integration tests, so that script would fail with "no test files". Conventions §6 says a script is added in the phase that introduces what it runs. Recommendation: no `test:integration` script in 1a; 1b adds it with the first integration test.
+
+> **Owner answer (2026-11-12):** Agreed. No `test:integration` script in 1a; 1b adds it with the first integration test.
+
+#### 2. `core/src/shared`
+
+- Scope: core · tests.
+  - `errors.ts` (shared errors of conventions §12: `NotFoundError`, `ForbiddenError`, `ValidationError`, `VersionConflictError`, `ConflictError`, each with a problem code and no HTTP status).
+  - `ids.ts` (`IdGenerator` type and a generator with injected clock and randomness).
+  - `clock.ts` (`Clock` type, system clock).
+  - `testing/` (fixed clock, sequential id generator), `index.ts`.
+  - Remove `passWithNoTests` from the Vitest preset.
+- Copy from: nothing; first code in the repository. Written to conventions §7, §8, §9 and §12.1.
+- Tests: each shared error carries its `name` and code; the fixed clock and sequential ids are deterministic; generated ids are unique and well-formed at the boundaries the format defines.
+- Gate: as above.
+
+> **Open question:** Which id format does `ids.ts` produce? Recommendation: UUIDv7 per RFC 9562, the same format conventions §13 gives database keys, so ids made by the in-memory run store in 1a look like the ones PostgreSQL makes in 1b. Node 24 has no built-in UUIDv7, so it is a few lines over `node:crypto`.
+
+> **Owner answer (2026-11-12):** UUIDv7 per RFC 9562.
+
+> **Default:** The shared errors carry the codes `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_FAILED`, `VERSION_CONFLICT` and `CONFLICT`. No doc names them yet; the shared problem-code catalogue is a 1b item and may rename them, and no 1a module throws them.
+
+#### 3. `core/src/tools`, the reference module
+
+- Scope: core · tests · config (add `zod` 4.6.7 to the catalog; it is on the core allowlist).
+  - `tool.types.ts` (`ToolDefinition`, effect tiers and policies as `as const` tuples), `tool.errors.ts` (`ToolProblem` union with a message map, `ToolRefusedError`), `tool-policy.rules.ts` (allowed policies per tier, tier floor, policy resolution, limits; returns problems, never throws), `tool-registry.ts` (`createToolRegistry`: registration, `Object.hasOwn` lookup, Zod 4 `toJSONSchema` export from strict objects, input validation, execution that returns error results), `builtin/get-current-time.tools.ts`, `testing/` (fake tools for each tier and policy), `index.ts`.
+  - `.dependency-cruiser.cjs`: `core-module-boundaries` also allows a test file to import another module's `testing/index.ts`.
+- Copy from: nothing; this becomes the reference (conventions §10.3). Error shape from the example in conventions §12.1.
+- Tests (conventions §19.1): `tool-policy.rules` at 100% coverage with every tier and policy pair, allowed and refused, and limits at 0, the limit and the limit + 1; schema tests with `safeParse` asserting issue code and path (`unrecognized_keys`, `too_big`); JSON Schema output has `additionalProperties: false` (D-3); the registry rejects a tool without a tier and policy (ADR-0014), returns `TOOL_INPUT_INVALID` without calling the handler, returns `TOOL_NOT_FOUND` for `constructor` and `__proto__` (KP-08), and never executes an `approve` tool; `get_current_time` with a fixed clock.
+- Gate: as above, plus the per-file 100% threshold on `tool-policy.rules.ts` shown failing the run once, with a temporary untested branch that is then removed.
+
+> **Open question:** Conventions §5.2 and agent design §4 place `tool-source.port.ts` in this module; the changes-by-layer table does not list it, and its second implementer (MCP) is Phase 6. Recommendation: follow the plan and leave the port out of 1a (conventions §1, right-sized); the registry takes built-in definitions directly.
+
+> **Owner answer (2026-11-12):** Approved: no `tool-source.port.ts` in 1a. The second dependency-cruiser change in this increment's scope is approved too.
+
+#### 4. `core/src/llm`
+
+- Scope: core · tests.
+  - `llm.port.ts` (`LlmProvider`: `generate`, `stream`, `capabilities`), `llm.types.ts` (messages, content parts, tool calls, usage, stop reasons including refusal, stream events), `llm.errors.ts` (`LlmProblem` union, `LlmError` with optional `retryAfterMs` and `cause`).
+  - `retry.rules.ts`, all five D-9 rules: retry only `LLM_RATE_LIMITED` and `LLM_UNAVAILABLE`; only when nothing was emitted; only under the route's `maxAttempts`; delay is the longer of backoff-with-jitter and `retryAfterMs`, with the random value passed in; refuse when the delay exceeds the remaining running-time budget. Cancellation (rule 5) is the loop's part, in increment 5.
+  - `model-registry.ts` (catalog and routes validated with Zod: tiered prices, per-task effort, `maxAttempts` default 3), `model-routing.rules.ts` (task route only; capability check), `usage.rules.ts` (integer micro-USD, tier by prompt size), `testing/` (`FakeLlmProvider` with scripted replies, scripted failures and partial streams), `index.ts`.
+- Copy from: `tools/tool.errors.ts`, `tools/tool-policy.rules.ts` and its test, `tools/tool-registry.ts` (factory shape), `tools/testing/`, `tools/index.ts`.
+- Tests: `retry.rules` at 100% (each D-9 case in the tests row of changes by layer, plus attempts at 1, `maxAttempts` − 1 and `maxAttempts`, and a remaining budget equal to the delay); `usage.rules` at 100% on both sides of the 100K boundary and with zero tokens; `model-routing.rules` at 100% (route found, unknown task, missing capability); catalog schema with `safeParse` (unknown key, missing price tier, `maxAttempts` 0); `FakeLlmProvider` replays its script exactly.
+- Gate: as above.
+
+> **Open question:** The changes-by-layer table puts LLM errors in `llm.types.ts`; conventions §12.1 puts a module's errors in `<module>.errors.ts`, and dependency-cruiser lets adapters import `.errors.ts`. Recommendation: `llm.errors.ts`.
+
+> **Owner answer (2026-11-12):** Approved: `llm.errors.ts`.
+
+> **Open question:** Reasoning blocks. Every model in D-1 thinks by default, returns reasoning blocks that must be sent back unchanged with tool results, and binds each block to the conversation before it. A request that replays a block after earlier turns were edited or summarised is rejected with a 400 on accounts created on or after 2026-08-31 (Anthropic's documented behaviour). Proposed decision by that standard (conventions §2.1): `llm.types` has an opaque reasoning content part that only the adapter reads; within a run the system prompt, the tool list and earlier messages never change; and the history-trimming rule removes reasoning parts from the turns it keeps whenever it drops or summarises older ones, never in the middle of a tool round. This narrows conventions §15.3 ("keep the recent turns verbatim") and needs the owner's agreement.
+
+> **Owner answer (2026-11-12):** The opaque reasoning content part in `llm.types`, read only by the adapter, is accepted. In 1a the history inside a run is append-only: no trimming and no summarising of turns, so reasoning blocks are always replayed exactly as received. Conventions §15.3 is not narrowed now. If a run's context would exceed the model's limit, the run fails; the feature doc proposes the code as an open question. History trimming and summarising, and how they interact with reasoning blocks, are decided in the 1b plan, when conversations exist. Before the adapter is written, Anthropic's current docs on preserved thinking and the history-editing check are read, and a contract test proves that a replayed reasoning part is sent back unchanged (increment 6).
+
+> **Open question:** D-4 puts the catalog in a config file read by the worker, which arrives in 1b. Recommendation: 1a ships the schema and validation only, with a sample catalog holding D-1's values in `llm/testing`; the real file, confirmed against Anthropic's docs, lands with the worker.
+
+> **Owner answer (2026-11-12):** Approved: schema and validation only in 1a, with D-1's values as a test sample.
+
+#### 5. `core/src/agent`
+
+- Scope: core · tests.
+  - `agent.types.ts` (run, step, outcome, run store), `agent.errors.ts` (`AgentProblem` union), `agent.rules.ts` (stop conditions, budget checks on running time only; no history trimming in 1a, owner 2026-11-12), `context-builder.ts` (stable prefix first, marked for caching; untrusted content wrapped and labelled; the history of a run is append-only), `agent-loop.ts` (`runAgent`: applies `retry.rules`, tracks emission, waits through an injected sleep that a cancel interrupts, runs read-only steps in parallel and others in order, records every step, call and tool call), `prompts/system.v1.md` (role, tools' purpose, external content is data, output format; conventions §15.5), `testing/` (in-memory run store), `index.ts`.
+- Copy from: the `tools` module for errors, rules, factory, testing and index; `llm/testing` for scripted providers.
+- Tests: `agent.rules` at 100% (each limit at 0, the limit and the limit + 1; running time that excludes paused time); the messages sent on each model call start with exactly the messages of the previous call, reasoning parts included; every loop scenario in the tests row of changes by layer, asserting what the run store received and what it did not (no write after a refusal before a step; no tool execution for `approve`); the prompt file states the untrusted-content rule.
+- Gate: as above.
+
+> **Open question:** ADR-0012 types the injected store as `ReturnType<typeof createAgentRunRepository>`, but that repository needs the database and arrives in 1b. Recommendation: 1a declares the store's type in `agent.types.ts`, sized to what the loop calls; 1b's repository must satisfy it, and the type then moves to the repository as ADR-0012 says. This is a temporary stand-in for the repository type, not a persistence port.
+
+> **Owner answer (2026-11-12):** Approved: the stand-in type lives in `agent.types.ts`, is temporary, and moves to the repository in 1b.
+
+#### 6. `integrations/src/llm/anthropic` and the contract suite
+
+- Scope: integrations · tests · config (add `@anthropic-ai/sdk` to the catalog, pinned exactly at 1.3.0; `msw` is already there).
+  - Before any adapter code: read Anthropic's current docs on preserved thinking and the history-editing check (owner, 2026-11-12).
+  - `packages/integrations` workspace files, moved here from increment 1: `package.json`, `tsconfig.json`, `tsconfig.test.json`, `eslint.config.mjs`, `vitest.config.ts`; its README loses its "not built yet" line.
+  - `llm/anthropic/anthropic.adapter.ts` (`createAnthropicProvider`: client with `maxRetries: 0`, per-call timeout and maximum output, streaming, effort from the route, cache markers on the marked prefix, `tool_choice` always `auto`, strict tools), mapping files for requests, responses and stream events, and for errors (429 → `LLM_RATE_LIMITED` with `retryAfterMs` from `retry-after-ms` or `retry-after`; 5xx, 529, connection and timeout errors → `LLM_UNAVAILABLE`; refusal stop reason → `LLM_REFUSED`; other 4xx → `LLM_REQUEST_REJECTED`; the vendor error only in `cause`).
+  - `testing/contract/` (the shared suite: one function that takes a provider factory and fixtures, so 1c's adapter runs the same cases), `llm/anthropic/fixtures/` for recordings and `llm/anthropic/fixtures/synthetic/` for hand-built error and refusal responses.
+  - A recording script the owner runs by hand with a low-limit test key (D-6). It stores response status, the headers the adapter reads, and bodies; never the key or account headers.
+- Copy from: the `tools` module for error and test style; `llm.types.ts` and `llm.errors.ts` are the contract. Adapter layout per conventions §10.1.
+- Tests: the contract suite over the fixtures with MSW (`msw/node`, `msw/http`): request mapping for text, tools and tool results; a reasoning part received from the provider is sent back unchanged, byte for byte, on the next request; response and stream-event mapping; usage including cache write and read tokens; every mapped error code; `retryAfterMs`; one request per call on a 429 and on a 529 (SDK retries off); the request never contains `temperature`, `top_p`, `top_k`, forced `tool_choice`, assistant prefill or the other fields of P-5.
+- Gate: as above, and the owner has reviewed the fixtures for personal data and keys before they are committed (P-3).
+
+Order inside the increment: adapter, mapping tests on hand-built shapes and the recording script first; then **stop for the owner to record**; then the contract suite on the recorded fixtures.
+
+Synthetic prompts for recording, all on `claude-haiku-5-5` at effort `low`, with the `get_current_time` tool where named:
+
+| Fixture | Call | Prompt |
+| --- | --- | --- |
+| `text-generate` | generate | "Reply with exactly the word: pong" |
+| `text-stream` | stream | "Count from one to five in words, separated by commas." |
+| `tool-call-stream` | stream, with the tool | "What time is it right now in UTC? Use the tool." |
+| `tool-result-stream` | stream; the previous turn replayed with a fixed tool result (`2026-01-01T00:00:00Z`) | (continuation of the previous fixture) |
+| `parallel-tools-stream` | stream, with the tool | "Give me the current time in UTC and in Asia/Dhaka. Call the tool once for each zone." |
+| `cache-write`, `cache-read` | generate, twice, with a synthetic system prompt long enough to cache | "Reply with exactly the word: cached" |
+| `max-output-stream` | stream, small maximum output | "Write three paragraphs about rivers." |
+
+> **Open question:** `@anthropic-ai/sdk` latest is 1.8.0 (2026-11-10). `minimumReleaseAge` allows 1.3.0 (2026-10-23) today; 1.4.0 clears on 2026-11-16. Recommendation: pin 1.3.0 exactly (P-1, conventions §15.11) with no exclusion; it already sends API version `2026-10-21` and has no sampling parameters in its types. The SDK brings `@opentelemetry/api`, `standardwebhooks` and `json-schema-to-ts` into the production audit of integrations.
+
+> **Owner answer (2026-11-12):** Approved: `@anthropic-ai/sdk` pinned exactly at 1.3.0.
+
+> **Open question:** Error responses (429 with a retry delay, 529, 500, 400, 401) and a refusal cannot be recorded on demand, and a refusal should not be provoked. Recommendation: build those fixtures by hand from Anthropic's documented shapes, in a `synthetic/` folder so they are never mistaken for recordings. D-6 speaks only of recorded fixtures.
+
+> **Owner answer (2026-11-12):** Approved: hand-built error and refusal fixtures in a `synthetic/` folder, clearly separated from recordings.
+
+#### 7. Docs and verification
+
+- Scope: docs.
+  - Agent design §7: retries move from the adapter to core in the diagram and text; the Retry-After rule, the mid-stream rule and what counts as emitted, `maxAttempts`, cancellation during a wait (D-9). §2's error bullet points to it.
+  - Conventions §5.2: the files 1a added that the layout does not show (`shared/ids.ts`, `shared/clock.ts`, `llm/retry.rules.ts`, `llm/llm.errors.ts`, `tools/tool.errors.ts`). §12: the new problem codes link to `features/agent.md`.
+  - `features/agent.md`: open questions replaced by the owner's answers; status line updated.
+  - Package READMEs and `docs/plans/README.md` status. This plan's 1a section is marked done with its date; ADR-0008 stays untouched.
+- Copy from: the existing sections' style; ADR amendment rule in conventions §4.2 if any accepted ADR needs a clarification.
+- Tests: the full verification below on a clean install (`pnpm install --frozen-lockfile`), with the final test count.
+- Gate: as above, and every link added resolves.
+
 ### Decisions
 
 | Id | Decision | Owner answer |
@@ -111,6 +254,11 @@ Each gets its own detailed plan, written and approved when the previous slice is
 | Test-database helpers | Testcontainers with the real roles script; migrations apply cleanly and are idempotent; upgrade tests against a database with rows; integration tests refuse a database whose name lacks `test` |
 | CI | Parallel jobs (checks, integration, migrations, audit, commits; e2e later); coverage gate; migration drift check; caches for `.turbo` and `.next/cache` |
 | Web patterns | Form failure mapping, a tested `proxy.ts`, `instrumentation.ts`, `server-env.ts` |
+| History trimming and summarising, with reasoning blocks | 1a keeps a run's history append-only and fails a run whose context exceeds the model's limit (owner, 2026-11-12). The 1b plan decides trimming and summarising of conversation history (conventions §15.3) and how they treat reasoning blocks, which current Claude models bind to the conversation before them: a block replayed after earlier turns were edited or summarised is rejected |
+| ADR-0009 §3 against D-4 | ADR-0009 has both composition roots (`apps/api`, `apps/worker`) build the provider registry; D-4 and ADR-0010 make the worker the only process that runs agents. The 1b plan settles which process builds it and amends ADR-0009 if needed |
+| Run store type | 1a's stand-in type in `agent.types.ts` moves to the repository (`ReturnType<typeof createAgentRunRepository>`, ADR-0012) |
+| Model catalog and tool policy file | 1a ships schema and validation only; the real file, with D-1's values confirmed against Anthropic's docs, lands with the worker (D-4) |
+| `test:integration` scripts | Added to each package with its first integration test |
 
 ### Carried into the 1c plan
 

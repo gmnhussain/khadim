@@ -7,4 +7,10 @@
 - Repositories use Drizzle and `@khadim/db` directly; persistence has no port (ADR-0012).
 - Modules import each other only through their `index.ts`.
 
-Not built yet: this folder holds only this README until its phase (conventions §2.3).
+Built so far (Phase 1a): `shared` (errors, ids, clock). The other modules arrive increment by increment ([plan](../../docs/plans/phase-1-agent-core.md#increments)).
+
+| Script | Does |
+| --- | --- |
+| `pnpm --filter @khadim/core lint` | ESLint with zero warnings |
+| `pnpm --filter @khadim/core typecheck` | `tsc` on source, then on tests with the test preset |
+| `pnpm --filter @khadim/core test:unit` | Unit tests with coverage; a `*.rules.ts` file below 100% fails the run |

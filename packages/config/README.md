@@ -11,7 +11,7 @@
 | `@khadim/config/eslint/node` | `createNodeConfig({ tsconfigRootDir: import.meta.dirname })` in Node workspaces |
 | `@khadim/config/eslint/base` | Base for future presets |
 | `@khadim/config/prettier` | Root `prettier.config.mjs` |
-| `@khadim/config/vitest` | `vitestBaseConfig`, merged in each workspace's `vitest.config.ts`: `unit` and `integration` projects, and the per-file 100% coverage gate on `*.rules.ts` |
+| `@khadim/config/vitest` | `vitestBaseConfig`, merged in each workspace's `vitest.config.ts`: `unit` and `integration` projects, and the per-file 100% coverage gate on `*.rules.ts`. Typed by `vitest/index.d.mts` |
 | `@khadim/config/ports` | `PORTS` constants for local development: tooling, tests and scripts only |
 
 ## Dependencies

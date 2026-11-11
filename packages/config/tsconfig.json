@@ -1,0 +1,6 @@
+{
+  // The presets are JavaScript; this project covers only their type declarations, so ESLint's
+  // project service and `tsc` can find them.
+  "extends": "./tsconfig/base.json",
+  "include": ["**/*.d.mts"]
+}

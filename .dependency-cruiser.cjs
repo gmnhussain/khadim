@@ -43,9 +43,12 @@ module.exports = {
     {
       name: "core-allowed-packages-only",
       comment:
-        "Core imports only allowlisted packages: zod, and drizzle-orm for repositories (ADR-0012). Workspace packages and Node built-ins are allowed. Extend the list only through an approved plan.",
+        "Core production code imports only allowlisted packages: zod, and drizzle-orm for repositories (ADR-0012). Workspace packages and Node built-ins are allowed. Test files and the Vitest config may import test tooling. Extend the list only through an approved plan.",
       severity: "error",
-      from: { path: "^packages/core/" },
+      from: {
+        path: "^packages/core/",
+        pathNot: ["\\.(test|int\\.test|spec)\\.ts$", "^packages/core/vitest\\.config\\.ts$"],
+      },
       to: {
         path: "node_modules/",
         pathNot: "node_modules/(zod|drizzle-orm)(/|$)",

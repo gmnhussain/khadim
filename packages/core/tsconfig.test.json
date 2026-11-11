@@ -1,0 +1,4 @@
+{
+  "extends": "@khadim/config/tsconfig/test.json",
+  "include": ["src", "vitest.config.ts"]
+}
