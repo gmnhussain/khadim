@@ -7,10 +7,11 @@
 | `@khadim/config/tsconfig/base.json` | Base for all presets (strict flags from conventions §6) |
 | `@khadim/config/tsconfig/node.json` | Code that runs on Node.js: `apps/api`, `apps/worker`, `packages/core`, `packages/integrations`, `packages/db` (add `@types/node` as a devDependency) |
 | `@khadim/config/tsconfig/library.json` | Browser-safe code: `packages/contracts`. No Node.js types, so a Node-only API fails to typecheck |
+| `@khadim/config/tsconfig/test.json` | Test files, typechecked separately (`tsc --noEmit -p tsconfig.test.json`); relaxes only `exactOptionalPropertyTypes` and the unused checks |
 | `@khadim/config/eslint/node` | `createNodeConfig({ tsconfigRootDir: import.meta.dirname })` in Node workspaces |
 | `@khadim/config/eslint/base` | Base for future presets |
 | `@khadim/config/prettier` | Root `prettier.config.mjs` |
-| `@khadim/config/vitest` | `vitestBaseConfig`, merged in each workspace's `vitest.config.ts` |
+| `@khadim/config/vitest` | `vitestBaseConfig`, merged in each workspace's `vitest.config.ts`: `unit` and `integration` projects, and the per-file 100% coverage gate on `*.rules.ts` |
 | `@khadim/config/ports` | `PORTS` constants for local development: tooling, tests and scripts only |
 
 ## Dependencies

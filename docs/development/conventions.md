@@ -234,14 +234,17 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Tool | Setup |
 | --- | --- |
 | Runtime | Node.js LTS pinned in `.nvmrc` and `engines`; `packageManager` pinned. |
-| Packages | pnpm workspaces; one version per dependency through `catalog:`; install scripts blocked by default; `pnpm install --frozen-lockfile` in CI; review the lockfile diff after every install. |
+| Packages | pnpm workspaces; one version per dependency through `catalog:`; every pinned or held-back version carries a comment saying why; install scripts blocked by default; `pnpm install --frozen-lockfile` in CI. Installs only at the repo root. |
+| Release age | `minimumReleaseAge` of two weeks: a version is installed only after it has been public that long. pnpm checks new resolutions, not versions already in the lockfile. An exception is an exact `name@version` in `minimumReleaseAgeExclude` with a comment giving the reason and the date it can be removed; remove it on that date. |
+| Lockfile | Review the lockfile diff after every install: it shows only what you added. If unrelated versions moved, restore the lockfile, re-add only your change and run `pnpm install --frozen-lockfile`. |
 | Tasks | Turborepo with declared outputs and env inputs; `dev` persistent and uncached; integration and e2e tests uncached. |
-| Lint | ESLint flat config, typescript-eslint `strictTypeChecked`, `import-x`, React Hooks, Next, `eslint-config-prettier` last; `--max-warnings 0`. Required rules: `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check`, `consistent-type-imports`, `no-explicit-any`, `no-non-null-assertion`, `eqeqeq`, `no-console`. Import cycles are checked by dependency-cruiser (`no-circular`), not ESLint. |
+| Lint | ESLint flat config, typescript-eslint `strictTypeChecked`, `import-x`, React Hooks, Next, `turbo`, `eslint-config-prettier` last; `--max-warnings 0`. Required rules: `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check`, `consistent-type-imports`, `no-explicit-any`, `no-non-null-assertion`, `restrict-template-expressions` (numbers allowed), `no-unused-vars` (a leading `_` marks intentionally unused), `import-x/no-duplicates`, `eqeqeq`, `no-console`, `no-param-reassign`, `no-else-return`, `prefer-object-has-own`, `turbo/no-undeclared-env-vars`. Import cycles are checked by dependency-cruiser (`no-circular`), not ESLint. |
 | Format | Prettier: `printWidth: 100`, `trailingComma: "all"`, Tailwind plugin. Markdown not formatted. |
-| TypeScript | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`; Bundler resolution. Tests typechecked separately. `erasableSyntaxOnly` enforces §7 (no `enum`, namespaces or parameter properties) and keeps the code runnable by plain type stripping. |
+| TypeScript | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`, `noUncheckedSideEffectImports`, `types: []` (Node types only through the `node` preset); Bundler resolution. Tests typechecked separately with the `test` preset, which relaxes only `exactOptionalPropertyTypes` and the unused checks. `erasableSyntaxOnly` enforces §7 (no `enum`, namespaces or parameter properties) and keeps the code runnable by plain type stripping. |
 | Editor | `.editorconfig` (UTF-8, LF, 2 spaces), `.gitattributes` (`* text=auto eol=lf`). |
+| Tests | Vitest preset with `unit` and `integration` projects (`vitest run --project <name>`) and a per-file 100% coverage threshold on `src/**/*.rules.ts` that fails the run. |
 | Boundaries | dependency-cruiser. |
-| Updates | Dependabot weekly; `pnpm audit --prod` in CI. |
+| Updates | Dependabot weekly; `pnpm audit --prod` in CI; Turbo and Next.js telemetry off in CI. |
 | CI supply chain | GitHub Actions pinned to full commit SHAs with the version in a trailing comment; container images run from workflow steps pinned by digest with the version in a comment, updated by hand. Dependabot updates the action SHAs. |
 | Secrets | gitleaks scans the full git history in CI on every PR and push; enable GitHub push protection when the repository plan offers it. |
 

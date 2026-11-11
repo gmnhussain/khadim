@@ -52,6 +52,8 @@ One commit per slice, in this order, each passing every check under [Verificatio
 | `.github/workflows/ci.yml` | `TURBO_TELEMETRY_DISABLED` and `NEXT_TELEMETRY_DISABLED` |
 | `docs/development/conventions.md` | §6 rows updated to match; lockfile rule: when an install moves unrelated versions, restore the lockfile and re-add only your lines |
 
+> **Implementation note (2026-11-11):** pnpm 10.34.9 applies `minimumReleaseAge` to new resolutions only, so the versions already locked (`eslint`, `typescript-eslint`, `eslint-plugin-import-x`, `dependency-cruiser`, `globals`) need no exclusion. Probing `pnpm add` showed what does: the `unrs-resolver` 1.13.0 platform binaries and `conventional-commits-parser` 7.1.4 (re-resolved by any add), the Vitest 5.1.0 and MSW 3.0.4 families for 1a, and `@typescript-eslint/utils` 8.72.2. Each is an exact `name@version` with its removal date in `pnpm-workspace.yaml`.
+
 ### 3. Coding standard for core
 
 All in `docs/development/conventions.md`. These are the rules 1a code follows.
@@ -152,6 +154,7 @@ Written into the named plan, approved with it, and built with the code that need
 | Item | Plan |
 | --- | --- |
 | Reference module `core/src/tools` built to every slice 3 rule; remove `passWithNoTests` | 1a |
+| Each package's `test:unit` script runs `vitest run --project unit --coverage`, so the 100% gate on `*.rules.ts` fires in every `pnpm test` and in CI; `test:integration` runs `vitest run --project integration` | 1a |
 | Backend standard written from 1a's code: service and repository patterns, app bootstrap and env secret strength, logging with `requestId` and `runId`, process lifecycle, API details (idempotency semantics, status codes and check order, sorting, search, static routes, one-time secrets, shared Zod field helpers, OpenAPI with Scalar and `openapi:check`), the shared problem-code catalogue and central error handler | 1b |
 | Database standard: write-once and immutable columns, grants (no `DELETE` except owner-deletable memory), custom security migrations, pool sizing, data-move rehearsal, `purpose` lookups, key-value settings | 1b |
 | Caching and performance rules | 1b |

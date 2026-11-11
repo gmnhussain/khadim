@@ -20,7 +20,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noUncheckedSideEffectImports": true,
     "forceConsistentCasingInFileNames": true,
+    "types": [],
     "skipLibCheck": true,
     "noEmit": true
   }

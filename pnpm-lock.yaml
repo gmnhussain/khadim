@@ -30,6 +30,9 @@ catalogs:
     eslint-plugin-import-x:
       specifier: ^4.18.1
       version: 4.18.1
+    eslint-plugin-turbo:
+      specifier: ^2.11.10
+      version: 2.11.10
     globals:
       specifier: ^17.14.0
       version: 17.14.0
@@ -92,6 +95,9 @@ importers:
       eslint-plugin-import-x:
         specifier: 'catalog:'
         version: 4.18.1(@typescript-eslint/utils@8.72.2(eslint@10.14.0(jiti@2.6.1))(typescript@6.0.3))(eslint@10.14.0(jiti@2.6.1))
+      eslint-plugin-turbo:
+        specifier: 'catalog:'
+        version: 2.11.10(eslint@10.14.0(jiti@2.6.1))(turbo@2.11.10)
       globals:
         specifier: 'catalog:'
         version: 17.14.0
@@ -628,6 +634,10 @@ packages:
     engines: {node: ^22||^24||>=26}
     hasBin: true
 
+  dotenv@16.0.3:
+    resolution: {integrity: sha512-7GO6HghkA5fYG9TYnNxi14/7K9f5occMlp3zXAuSxn7CKCxt9xbNWG7yF8hTCSUchlfWSe3uLmlPfigevRItzQ==}
+    engines: {node: '>=12'}
+
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
 
@@ -700,6 +710,12 @@ packages:
         optional: true
       eslint-import-resolver-node:
         optional: true
+
+  eslint-plugin-turbo@2.11.10:
+    resolution: {integrity: sha512-he4kQi41ZX8KM9fxCCl9cmhbk37bNnXR0EVGP6xc12KvxfoosfHmMVsdo7zX2a1G/iPhbLaXSATZorXAA5eXOw==}
+    peerDependencies:
+      eslint: '>6.6.0'
+      turbo: '>2.0.0'
 
   eslint-scope@9.1.2:
     resolution: {integrity: sha512-xS90H51cKw0jltxmvmHy2Iai1LIqrfbw57b79w/J7MfvDfkIkFZ+kj6zC3BjtUwh150HsSSdxXZcsuv72miDFQ==}
@@ -1700,6 +1716,8 @@ snapshots:
       tsconfig-paths-webpack-plugin: 4.2.0
       watskeburt: 6.0.0
 
+  dotenv@16.0.3: {}
+
   emoji-regex@10.6.0: {}
 
   enhanced-resolve@5.26.0:
@@ -1767,6 +1785,12 @@ snapshots:
       '@typescript-eslint/utils': 8.72.2(eslint@10.14.0(jiti@2.6.1))(typescript@6.0.3)
     transitivePeerDependencies:
       - supports-color
+
+  eslint-plugin-turbo@2.11.10(eslint@10.14.0(jiti@2.6.1))(turbo@2.11.10):
+    dependencies:
+      dotenv: 16.0.3
+      eslint: 10.14.0(jiti@2.6.1)
+      turbo: 2.11.10
 
   eslint-scope@9.1.2:
     dependencies:

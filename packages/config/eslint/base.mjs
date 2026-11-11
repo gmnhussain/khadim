@@ -3,7 +3,11 @@ import { defineConfig } from "eslint/config";
 import prettierConfig from "eslint-config-prettier";
 import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import { importX } from "eslint-plugin-import-x";
+import turbo from "eslint-plugin-turbo";
 import { configs as typescriptConfigs } from "typescript-eslint";
+
+/** Names whose leading underscore marks them as intentionally unused (conventions §8). */
+const UNUSED_PATTERN = "^_";
 
 /** Paths no workspace ever lints. */
 const IGNORED_PATHS = [
@@ -33,6 +37,7 @@ export function createBaseConfig({ tsconfigRootDir }) {
       settings: {
         "import-x/resolver-next": [createTypeScriptImportResolver()],
       },
+      plugins: { turbo },
       linterOptions: { reportUnusedDisableDirectives: "error" },
       rules: {
         "@typescript-eslint/consistent-type-imports": [
@@ -44,6 +49,28 @@ export function createBaseConfig({ tsconfigRootDir }) {
         "@typescript-eslint/no-misused-promises": "error",
         "@typescript-eslint/no-non-null-assertion": "error",
         "@typescript-eslint/switch-exhaustiveness-check": "error",
+        // Options replace the preset's, so the strict ones are restated; only numbers are added.
+        "@typescript-eslint/restrict-template-expressions": [
+          "error",
+          {
+            allowAny: false,
+            allowBoolean: false,
+            allowNever: false,
+            allowNullish: false,
+            allowRegExp: false,
+            allowNumber: true,
+          },
+        ],
+        "@typescript-eslint/no-unused-vars": [
+          "error",
+          {
+            argsIgnorePattern: UNUSED_PATTERN,
+            varsIgnorePattern: UNUSED_PATTERN,
+            caughtErrorsIgnorePattern: UNUSED_PATTERN,
+            destructuredArrayIgnorePattern: UNUSED_PATTERN,
+          },
+        ],
+        "import-x/no-duplicates": "error",
         // Cycles are checked once, by dependency-cruiser's no-circular rule; import-x/no-cycle
         // duplicates it and is slow with type-aware linting.
         // TypeScript already checks member access on default imports.
@@ -51,6 +78,10 @@ export function createBaseConfig({ tsconfigRootDir }) {
         eqeqeq: ["error", "always"],
         "no-console": "error",
         "no-param-reassign": "error",
+        "no-else-return": "error",
+        "prefer-object-has-own": "error",
+        // An env variable Turbo does not know about is missing from cache keys (stale builds).
+        "turbo/no-undeclared-env-vars": "error",
       },
     },
     {

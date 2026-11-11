@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Khadim test files: typechecked separately, with checks that only add noise in tests relaxed",
+  "extends": "./node.json",
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  }
+}

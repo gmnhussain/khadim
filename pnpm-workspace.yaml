@@ -7,6 +7,54 @@ packages:
 # Fail install on the wrong Node.js or pnpm version (package.json "engines").
 engineStrict: true
 
+# Supply chain (conventions §6): a version is installed only after it has been public for two
+# weeks (minutes), so a hijacked release is usually found and pulled first. pnpm checks new
+# resolutions only; versions already in the lockfile are not re-checked.
+minimumReleaseAge: 20160
+
+# Exact versions that are inside the window but needed now. Remove each line on its date.
+# A security patch inside the window gets its own line with a reason and a date.
+minimumReleaseAgeExclude:
+  # unrs-resolver 1.13.0 (eslint-import-resolver-typescript) platform binaries, released
+  # 2026-10-31; any `pnpm add` re-resolves them. Remove after 2026-11-14.
+  - "@unrs/resolver-binding-android-arm-eabi@1.13.0"
+  - "@unrs/resolver-binding-android-arm64@1.13.0"
+  - "@unrs/resolver-binding-darwin-arm64@1.13.0"
+  - "@unrs/resolver-binding-darwin-x64@1.13.0"
+  - "@unrs/resolver-binding-freebsd-x64@1.13.0"
+  - "@unrs/resolver-binding-linux-arm-gnueabihf@1.13.0"
+  - "@unrs/resolver-binding-linux-arm-musleabihf@1.13.0"
+  - "@unrs/resolver-binding-linux-arm64-gnu@1.13.0"
+  - "@unrs/resolver-binding-linux-arm64-musl@1.13.0"
+  - "@unrs/resolver-binding-linux-loong64-gnu@1.13.0"
+  - "@unrs/resolver-binding-linux-loong64-musl@1.13.0"
+  - "@unrs/resolver-binding-linux-ppc64-gnu@1.13.0"
+  - "@unrs/resolver-binding-linux-riscv64-gnu@1.13.0"
+  - "@unrs/resolver-binding-linux-riscv64-musl@1.13.0"
+  - "@unrs/resolver-binding-linux-s390x-gnu@1.13.0"
+  - "@unrs/resolver-binding-linux-x64-gnu@1.13.0"
+  - "@unrs/resolver-binding-linux-x64-musl@1.13.0"
+  - "@unrs/resolver-binding-openharmony-arm64@1.13.0"
+  - "@unrs/resolver-binding-win32-arm64-msvc@1.13.0"
+  - "@unrs/resolver-binding-win32-ia32-msvc@1.13.0"
+  - "@unrs/resolver-binding-win32-x64-msvc@1.13.0"
+  # commitlint 21.2.4 dependency, released 2026-11-01. Remove after 2026-11-15.
+  - conventional-commits-parser@7.1.4
+  # Vitest 5.1.0 for Phase 1a (phase-1-agent-core, tooling upgrades), released 2026-10-29 to
+  # 2026-11-02. Remove after 2026-11-16.
+  - vitest@5.1.0
+  - "@vitest/coverage-v8@5.1.0"
+  - "@vitest/mocker@5.1.0"
+  - "@vitest/spy@5.1.0"
+  - "@vitest/istanbul-lib-coverage@2.1.0"
+  - "@vitest/istanbul-lib-report@2.1.0"
+  # MSW 3.0.4 for Phase 1a adapter fixtures (phase-1-agent-core D-2), released 2026-11-06.
+  # Remove after 2026-11-20.
+  - msw@3.0.4
+  # typescript-eslint 8.72.2 (already locked), re-resolved when Phase 1a's test packages are
+  # added, released 2026-11-09. Remove after 2026-11-23.
+  - "@typescript-eslint/utils@8.72.2"
+
 # pnpm 10 blocks dependency install scripts by default.
 # Allow one only with a reason, e.g.:
 # onlyBuiltDependencies:
@@ -16,15 +64,18 @@ catalog:
   "@commitlint/cli": ^21.2.4
   "@commitlint/config-conventional": ^21.2.4
   "@eslint/js": ^10.0.1
+  # Node.js 24 types match the runtime in .nvmrc; Node 26 is a separate change (phase-1 plan).
   "@types/node": ^24.19.2
   dependency-cruiser: ^18.7.2
   eslint: ^10.14.0
   eslint-config-prettier: ^10.1.8
   eslint-import-resolver-typescript: ^4.4.5
   eslint-plugin-import-x: ^4.18.1
+  eslint-plugin-turbo: ^2.11.10
   globals: ^17.14.0
   prettier: ^3.6.2
   turbo: ^2.5.6
+  # TypeScript 7 waits for typescript-eslint support (it supports < 6.1 today).
   typescript: ^6.0.3
   typescript-eslint: ^8.72.2
   vitest: ^5.1.0
