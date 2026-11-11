@@ -5,8 +5,8 @@
 | Plan | Status |
 | --- | --- |
 | [phase-0-foundation.md](phase-0-foundation.md) | Done |
-| [foundation-review.md](foundation-review.md) | Approved; slices 1–5 done, slice 6 next |
-| [phase-1-agent-core.md](phase-1-agent-core.md) | Approved; slice 1a next |
+| [foundation-review.md](foundation-review.md) | Done 2026-11-12 |
+| [phase-1-agent-core.md](phase-1-agent-core.md) | Re-approved 2026-11-12; slice 1a next |
 
 ## Template
 

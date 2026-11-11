@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| Status | Approved by the owner, 2026-11-11 (revision 2); decisions as recommended |
+| Status | Done 2026-11-12. Approved by the owner, 2026-11-11 (revision 2); decisions as recommended, each now recorded in its home: D-1 in ADR-0016; D-2 in conventions §18 (unchanged); D-3 in background jobs; D-4 in conventions §10.3; D-5 in conventions §4.2; D-6, D-7 and D-8 in the PRD's Phase 2 and 3 rows and conventions §15.9; D-9 in `pnpm-workspace.yaml` and conventions §6; D-10 in the phase-1 plan (1d carry-over); D-12 in security and the phase-1 plan (1d); D-11 in conventions §3.1 |
 | Phase | Between 0 and 1a, on branch `chore/apply-foundation-review` |
 | Sources | The SaaS Engineering Standard and the building-saas repository (both the owner's own work), a review of this repository, and a second review of revision 1 of this plan |
 
