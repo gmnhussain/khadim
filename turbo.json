@@ -6,10 +6,19 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
+    // Workspace packages ship TypeScript source, so a package's lint, typecheck and unit tests
+    // read its dependencies' source. This no-script "transit" task puts the dependencies' hashes
+    // into theirs, so a change in core invalidates the cache of integrations, without making
+    // the tasks wait for each other.
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
     "lint": {
+      "dependsOn": ["transit"],
       "outputs": []
     },
     "typecheck": {
+      "dependsOn": ["transit"],
       "outputs": []
     },
     "test": {
@@ -17,6 +26,7 @@
       "outputs": []
     },
     "test:unit": {
+      "dependsOn": ["transit"],
       "outputs": ["coverage/**"]
     },
     "test:integration": {

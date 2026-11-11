@@ -5,8 +5,8 @@
 | Export | Use it in |
 | --- | --- |
 | `@khadim/config/tsconfig/base.json` | Base for all presets (strict flags from conventions §6) |
-| `@khadim/config/tsconfig/node.json` | `apps/api`, `apps/worker` |
-| `@khadim/config/tsconfig/library.json` | `packages/*` |
+| `@khadim/config/tsconfig/node.json` | Code that runs on Node.js: `apps/api`, `apps/worker`, `packages/core`, `packages/integrations`, `packages/db` (add `@types/node` as a devDependency) |
+| `@khadim/config/tsconfig/library.json` | Browser-safe code: `packages/contracts`. No Node.js types, so a Node-only API fails to typecheck |
 | `@khadim/config/eslint/node` | `createNodeConfig({ tsconfigRootDir: import.meta.dirname })` in Node workspaces |
 | `@khadim/config/eslint/base` | Base for future presets |
 | `@khadim/config/prettier` | Root `prettier.config.mjs` |
@@ -29,7 +29,7 @@ Production code (`src/`, outside test files) never imports `@khadim/config`, inc
 ```jsonc
 // packages/core/tsconfig.json
 {
-  "extends": "@khadim/config/tsconfig/library.json",
+  "extends": "@khadim/config/tsconfig/node.json",
   "include": ["src"]
 }
 ```

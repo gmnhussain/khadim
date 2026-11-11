@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Khadim Node app (api, worker)",
+  "display": "Khadim Node.js code: apps (api, worker) and packages (core, integrations, db)",
   "extends": "./base.json",
   "compilerOptions": {
     "types": ["node"]

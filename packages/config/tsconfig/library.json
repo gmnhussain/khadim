@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Khadim workspace package (ships TypeScript source)",
+  "display": "Khadim browser-safe package (contracts): no Node.js types",
   "extends": "./base.json",
   "compilerOptions": {
     "types": []
