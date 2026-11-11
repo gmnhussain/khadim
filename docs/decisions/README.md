@@ -18,7 +18,8 @@
 | [0012](ADR-0012-repositories-in-core-with-drizzle.md) | Repositories live in core and use Drizzle directly | Accepted |
 | [0013](ADR-0013-serialized-resume-and-bounded-run-streams.md) | Serialized, outbox-backed resume and bounded run event streams | Accepted |
 | [0014](ADR-0014-unclassified-tools-are-never-offered.md) | Unclassified tools are never offered to the model | Accepted |
-| [0015](ADR-0015-private-mode-fails-closed.md) | `private` access mode fails closed | Accepted |
+| [0015](ADR-0015-private-mode-fails-closed.md) | `private` access mode fails closed | Accepted (amendment proposed in ADR-0016) |
+| [0016](ADR-0016-loopback-gate-only-without-proxy.md) | The `loopback` gate is only for unproxied local use | Proposed |
 
 ## Template
 
