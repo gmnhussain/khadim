@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
-# Checks the commit message against Conventional Commits (conventions §3).
-pnpm exec commitlint --edit "$1"
+# Rejects AI attribution (conventions §3.1), then checks Conventional Commits (§3).
+sh "$(git rev-parse --show-toplevel)/scripts/check-commit-attribution.sh" "$1" || exit 1
+exec pnpm exec commitlint --edit "$1"

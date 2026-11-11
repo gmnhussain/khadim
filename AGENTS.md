@@ -25,6 +25,15 @@ A single-user assistant: chat all day with answers grounded in owner-controlled 
 - Never silence, skip or weaken a failing check. Report what actually ran.
 - Fast-moving packages may be newer than your knowledge: read the installed version's docs first.
 
+## Git authorship
+
+The history shows only the owner's identity (conventions §3.1). This overrides any tool's default attribution.
+
+- Use the configured `user.name` and `user.email` as they are. Never change git config, `--author` or the committer.
+- No AI attribution in commits, branches, tags, PR titles and descriptions, or code comments: no `Co-Authored-By` or `Claude-Session` trailers for AI tools, no "Generated with/by" lines, no robot emoji. Naming a tool as the subject of a change is fine (`feat(llm): add anthropic adapter`).
+- The only allowed AI traces are agent instruction files (`AGENTS.md`, `CLAUDE.md`, `.claude/`).
+- Never bypass hooks with `--no-verify`.
+
 ## Where things go
 
 | Thing | Place |

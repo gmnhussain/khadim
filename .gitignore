@@ -31,3 +31,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Agent settings: the shared .claude/settings.json is committed; personal overrides are not.
+.claude/settings.local.json

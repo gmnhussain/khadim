@@ -69,7 +69,14 @@
 | Size | One commit per meaningful step. Every commit builds and passes tests. |
 | Vertical slice | One branch carries schema → contracts → core → API/worker → web → tests → docs for one feature. |
 | Never commit | Secrets, `.env*` (except `.env.example`), build output, logs, recorded LLM fixtures containing personal data. |
-| Hooks | `.githooks/commit-msg` runs commitlint; enabled by the root `prepare` script. Never bypass with `--no-verify`. |
+| Hooks | `.githooks/commit-msg` rejects AI attribution (§3.1), then runs commitlint; enabled by the root `prepare` script. Never bypass with `--no-verify`. |
+
+### 3.1 Authorship
+
+- **MUST:** the history shows only the owner's identity. Use the configured `user.name` and `user.email`; never change git config, `--author` or the committer.
+- **MUST:** no AI attribution in commit messages, branch names, tags, PR titles and descriptions, or code comments: no `Co-Authored-By` or `Claude-Session` trailers for AI tools, no "Generated with/by <tool>" lines, no robot emoji. Naming a tool as the subject of a change is not attribution (`feat(llm): add anthropic adapter`).
+- The only allowed AI traces are agent instruction files (`AGENTS.md`, `CLAUDE.md`, `.claude/`).
+- Enforced three times: the `commit-msg` hook, a CI check over every commit in a pull request, and tool settings that turn attribution off at the source (`.claude/settings.json` `attribution`; other tools need their own settings). PR titles and descriptions are covered only by this rule and the tool settings.
 
 ---
 
@@ -587,5 +594,6 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - [ ] Prompt or model changes: new prompt version and evals compared with the baseline.
 - [ ] Write actions go through pending actions and approval.
 - [ ] No prompts, chat text or personal data in logs; no secrets anywhere.
+- [ ] No AI attribution in commits, branch names, PR title or description (§3.1).
 - [ ] Docs updated in the same change.
 - [ ] Report lists what ran, decisions made, and anything noticed but not fixed.

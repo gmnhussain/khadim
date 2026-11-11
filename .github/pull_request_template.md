@@ -17,6 +17,7 @@
 - [ ] Prompt or model changes: new prompt version, evals compared with baseline
 - [ ] Write actions go through pending actions and approval
 - [ ] No prompts, chat text or personal data in logs; no secrets anywhere
+- [ ] No AI attribution in commits, title or description (§3.1)
 - [ ] Docs updated in the same change
 
 ## Noticed but not fixed
