@@ -35,7 +35,7 @@
 
 ### 2.1 Before changing anything
 
-- Read `AGENTS.md`, the glossary, the business rules, the feature doc, this standard and the reference module.
+- Read `AGENTS.md`, the glossary, the business rules, the feature doc, this standard and the reference module (§10.3), and copy its shape.
 - **MUST:** if a rule is missing or ambiguous, stop and ask.
 - Fast-moving packages (Next.js, the Anthropic SDK, BullMQ, Drizzle) may be newer than your knowledge. Read the installed version's docs and changelog before writing code.
 
@@ -261,8 +261,18 @@ Root scripts: `dev`, `build`, `lint`, `typecheck`, `format`, `test`, `test:unit`
 - Inject time and randomness (`now`, `randomId`); pure rules never read the clock.
 - Discriminated results for expected outcomes: `{ ok: true; value } | { ok: false; problem }`.
 - `??` not `||`; early returns; never reassign parameters; no floating promises; never `!` to silence the compiler.
+- `satisfies` checks a literal while keeping its narrow type: `const IS_RETRYABLE = { LLM_RATE_LIMITED: true, LLM_UNAVAILABLE: true } as const satisfies Partial<Record<ProblemCode, boolean>>;`. Tool policies and model routes are configuration, never constants in code (ADR-0009, ADR-0014).
+- Lookups over a union are `Record<Union, X>` maps, so a new union member fails to compile until it is handled: `const PAUSES_RUN: Record<ToolPolicy, boolean> = { auto: false, propose: false, approve: true };`.
+- Array parameters are `readonly T[]`; a function never mutates its inputs.
+- `Object.hasOwn(object, key)` before indexing an object with a key from a request, a model or any other untrusted source (prototype keys such as `constructor`).
+- With `exactOptionalPropertyTypes`, never pass `undefined` into an optional property: add the key only when defined (`...(limit !== undefined ? { limit } : {})`), and declare optional fields fed from Zod output as `field?: T | undefined`.
+- With `noUncheckedIndexedAccess`, destructure with defaults or check for `undefined`; never `!`.
+- A `catch` binding is `unknown`; narrow it (`instanceof Error`) before reading `.message`.
+- Numeric separators in long literals: `120_000`, `5_000_000`.
+- A state the code guarantees cannot happen throws a plain `Error` with a clear message (`throw new Error("tool registered twice: search_memory")`). Expected failures are domain errors (§12).
+- Function declarations for exported factories, rules, components and handlers; `const` arrow functions for local helpers and callbacks.
 - No magic numbers or strings: named constants (`MAX_AGENT_ITERATIONS`, `DEFAULT_POST_HOUR`).
-- One exported module or component per file. The only barrels are core module `index.ts` files, and they export only the module's public surface (§5.4).
+- One exported module or component per file; small private helpers used only by it stay at the top of the file. The only barrels are core module `index.ts` files, and they export only the module's public surface (§5.4).
 - Timestamps in UTC; business times in the configured time zone (`Asia/Dhaka`).
 
 ---
@@ -276,9 +286,15 @@ Full words, no abbreviations (allowed: `id`, `url`, `db`, `tx`, `ctx`, `req`, `r
 | Files | kebab-case + role suffix | `agent-run.service.ts`, `chat-panel.tsx` |
 | Functions, variables | camelCase | `startRun`, `retrievedChunks` |
 | Types, components | PascalCase | `AgentRun`, `ApprovalCard` |
-| Constants | UPPER_SNAKE_CASE | `MAX_AGENT_ITERATIONS` |
+| Constants: values and tuples | UPPER_SNAKE_CASE | `MAX_AGENT_ITERATIONS`, `TOOL_POLICIES` |
 | Booleans | `is` / `has` / `can` / `should` | `isEnabled`, `supportsComments` |
+| Maps / sets | `xByY` / `xSet` | `toolByName`, `enabledProviderSet` |
+| Assertions / resolvers | `assertX` throws; `resolveX` returns a result | `assertToolClassified`, `resolveModelRoute` |
 | Factories | `create<Thing><Layer>` | `createAgentRunService` |
+| Factory types | `ReturnType<typeof create…>` | `type AgentRunService = ReturnType<typeof createAgentRunService>` |
+| Props types | `<Component>Props` | `ApprovalCardProps` |
+| Constants: objects used as enums | PascalCase object, UPPER_SNAKE keys | `ProblemCode.RUN_BUDGET_EXCEEDED` |
+| Unused parameters | leading underscore | `(_input, context)` |
 | DB tables / columns | snake_case, plural tables | `agent_runs.input_tokens` |
 | JSON fields | camelCase | `inputTokens` |
 | Enum values | snake_case strings | `awaiting_approval` |
@@ -298,6 +314,8 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
 
 - No narrating comments. Comment the non-obvious **why** and cite ids: `// BR-12: never publish without an approved pending action.`
 - One-line JSDoc on exported functions and types.
+- Explain a workaround where it happens: `// pg returns count(*) as a string; convert it here so callers get a number.`
+- Config files and pinned or held-back versions say why: `# TypeScript 7 waits for typescript-eslint support.`
 - No commented-out code. `TODO(<owner>): …` only, never anonymous.
 
 ---
@@ -329,6 +347,12 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
 - Express 5 forwards rejected promises; no `try/catch` in handlers.
 - Graceful shutdown on `SIGTERM`/`SIGINT`: stop accepting work, finish the current step of in-flight runs (a retried job resumes them), close SSE responses, DB and Redis.
 
+### 10.3 Reference module
+
+- **`packages/core/src/tools` is the reference for core code.** It is built first in Phase 1a to every rule in §7, §8, §9, §12 and §19.1: types, errors, pure rules with 100% coverage, a factory with injected dependencies, a `testing/` fake and an `index.ts` public surface. `llm` and `agent` copy its shape.
+- The reference for database-backed, full-stack code (table, repository, contract, controller, routes and their tests) is the first such module, built in Phase 1b. Templates for both are taken from these modules, never written ahead of them.
+- When a reference module changes shape, the modules that copied it change in the same branch or get a recorded follow-up.
+
 ---
 
 ## 11. API standards
@@ -357,8 +381,38 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
 - Every error response is `application/problem+json` with `type`, `title`, `status`, `detail`, a stable UPPER_SNAKE `code`, `requestId`, and `errors[]` for field-level problems. Never internals on `5xx`.
 - No try/catch in handlers: services throw typed domain errors; one central handler maps them.
 - Shared errors: `NotFoundError`, `ForbiddenError`, `ValidationError`, `VersionConflictError`, `ConflictError`.
-- Agent-specific codes: `RUN_BUDGET_EXCEEDED`, `RUN_ITERATION_LIMIT`, `LLM_UNAVAILABLE` (503), `LLM_RATE_LIMITED` (429 upstream, retried first), `TOOL_INPUT_INVALID`, `PLATFORM_NOT_CONNECTED`, `PLATFORM_CAPABILITY_UNSUPPORTED`, `APPROVAL_REQUIRED`.
+- Agent-specific codes: `RUN_BUDGET_EXCEEDED`, `RUN_ITERATION_LIMIT`, `LLM_UNAVAILABLE` (503), `LLM_RATE_LIMITED` (429 upstream, retried first), `LLM_REFUSED` (the model refused; the run ends, phase-1 plan D-8), `TOOL_INPUT_INVALID`, `PLATFORM_NOT_CONNECTED`, `PLATFORM_CAPABILITY_UNSUPPORTED`, `APPROVAL_REQUIRED`.
 - Pure rules return a problem code; services turn it into the error.
+
+### 12.1 Domain errors
+
+- Shared errors live in `core/src/shared/errors.ts`; a module's own errors in `<module>.errors.ts`, as `Error` subclasses with `name` set. They carry problem codes, never HTTP status codes; the API's central handler maps codes to statuses.
+- A module's error carries a problem from a **closed union of its problem codes** (UPPER_SNAKE_CASE, the same `code` the API returns), with a message map (and a field map where a problem belongs to one input field), so a new problem fails to compile until it has a message. The example is illustrative: only `TOOL_INPUT_INVALID` is a documented code, and the agent feature doc (`features/agent.md`, written in 1a) defines the real ones.
+
+  ```ts
+  export type ToolProblem = "TOOL_INPUT_INVALID" | "TOOL_UNCLASSIFIED" | "TOOL_LIMIT_REACHED";
+
+  const TOOL_PROBLEM_MESSAGES: Record<ToolProblem, string> = {
+    TOOL_INPUT_INVALID: "The tool input does not match its schema.",
+    TOOL_UNCLASSIFIED: "The tool has no owner-assigned tier and policy.",
+    TOOL_LIMIT_REACHED: "The tool reached its per-run or per-day call limit.",
+  };
+
+  /** A tool call refused by the registry or its policy (ADR-0011, ADR-0014). */
+  export class ToolRefusedError extends Error {
+    readonly problem: ToolProblem;
+    constructor(problem: ToolProblem) {
+      super(TOOL_PROBLEM_MESSAGES[problem]);
+      this.name = "ToolRefusedError";
+      this.problem = problem;
+    }
+  }
+  ```
+
+- **Pure rules return a problem** (`Extract<ToolProblem, "TOOL_LIMIT_REACHED"> | undefined`) instead of throwing; the service throws the error. Rules stay pure and their tests need no `expect(() => …).toThrow()`.
+- Problem codes (`code`) are UPPER_SNAKE_CASE; field reason codes inside `errors[]` are snake_case (`too_long`).
+- **Adapters map vendor errors to core problems** (`LLM_RATE_LIMITED`, `LLM_UNAVAILABLE`, `LLM_REFUSED`) and never let a vendor error type or message cross the port. The original error goes in `cause`, for logs only.
+- Errors returned to the model (tool errors, §15.4) are results, not exceptions: a short, actionable message the model can act on.
 
 ---
 
@@ -558,6 +612,14 @@ Target **OWASP ASVS Level 2** for the web app and API, plus §15.11 for the agen
 - Every API route: success, validation error, unauthenticated, not found, conflict, stale version.
 - Factories instead of shared fixtures; deterministic ids and clocks where it matters.
 - Test names are sentences that cite rules: `it("never publishes without an approved pending action (BR-12)")`.
+
+### 19.1 Unit tests
+
+- **Pure rules at exact boundaries:** 0, the limit, the limit + 1 and the empty case; for prices, both sides of each tier boundary (`usage.rules` at 100K prompt tokens); every state transition, allowed and refused.
+- **Schemas with `safeParse`:** assert `success` and the specific issue code and path (an unknown key on a strict object, a string over its `max()`), never only that parsing failed.
+- **Services with injected fakes** (`FakeLlmProvider`, an in-memory run store, a fixed clock and id generator): assert what was written and what was not (a refusal happens before any write; a no-op writes nothing). Factories make this possible, so own modules are never replaced with `vi.mock`.
+- **Adapters with recorded fixtures:** assert the mapped request, the mapped response and every mapped error code; assert that rejected fields are never sent (P-5 of the Phase 1 plan).
+- Packages run unit tests with `vitest run --project unit --coverage`, so the per-file 100% gate on `*.rules.ts` fails the run (§6).
 
 ---
 

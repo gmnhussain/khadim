@@ -154,6 +154,7 @@ Written into the named plan, approved with it, and built with the code that need
 | Item | Plan |
 | --- | --- |
 | Reference module `core/src/tools` built to every slice 3 rule; remove `passWithNoTests` | 1a |
+| Open decision for the 1a plan: who retries a model call, the provider SDK or the adapter, never both. Official SDKs retry by default, and conventions §15.2 also requires retries with backoff, so both together would double the retries | 1a |
 | Each package's `test:unit` script runs `vitest run --project unit --coverage`, so the 100% gate on `*.rules.ts` fires in every `pnpm test` and in CI; `test:integration` runs `vitest run --project integration` | 1a |
 | Backend standard written from 1a's code: service and repository patterns, app bootstrap and env secret strength, logging with `requestId` and `runId`, process lifecycle, API details (idempotency semantics, status codes and check order, sorting, search, static routes, one-time secrets, shared Zod field helpers, OpenAPI with Scalar and `openapi:check`), the shared problem-code catalogue and central error handler | 1b |
 | Database standard: write-once and immutable columns, grants (no `DELETE` except owner-deletable memory), custom security migrations, pool sizing, data-move rehearsal, `purpose` lookups, key-value settings | 1b |
