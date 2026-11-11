@@ -124,6 +124,15 @@ Package APIs were checked against the published packages before this section was
 
 > **Owner answer (2026-11-12):** Approved: no `tool-source.port.ts` in 1a. The second dependency-cruiser change in this increment's scope is approved too.
 
+> **Owner answer (2026-11-12):** Increment 3 is approved, and these choices, made while writing it, are confirmed:
+> - One file more than the list above: `tool-definition.ts` holds `defineTool`, which ties a handler's input type to its Zod schema and makes the handler reachable only after validation.
+> - The registry splits a call in two: `resolveToolCall` (offered to the task, valid input, within limits) and `executeToolCall`. An `approve` call resolves but can never execute; the loop turns it into a pending action (increment 5).
+> - Configuration shape: `policies` by tool name (policy, `maxCallsPerRun`, `maxCallsPerDay`) and `tasks` listing tool names. A limit is a whole number of at least 1.
+> - A task that lists a tool no source provides stops startup with `TOOL_UNCLASSIFIED`, like a tool without a policy: it has no tier.
+> - Arguments bound by the run (conventions §15.4) are not built: their first user is `reply_to_comment` in Phase 5.
+> - The boundary change is two rules: `core-module-boundaries` allows another module's `testing/index.ts`, and a new `testing-only-in-tests` rule keeps every `testing/` folder out of production code.
+> - JSON Schema is exported in Zod's `input` mode. In the default output mode a non-strict `z.object` also reports `additionalProperties: false`, which would have hidden a schema that lets unknown keys through.
+
 #### 4. `core/src/llm`
 
 - Scope: core · tests.

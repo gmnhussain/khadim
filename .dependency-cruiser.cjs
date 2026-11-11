@@ -78,8 +78,24 @@ module.exports = {
       from: { path: "^packages/core/src/([^/]+)/" },
       to: {
         path: "^packages/core/src/[^/]+/",
-        pathNot: ["^packages/core/src/$1/", "^packages/core/src/[^/]+/index\\.ts$"],
+        pathNot: [
+          "^packages/core/src/$1/",
+          "^packages/core/src/[^/]+/index\\.ts$",
+          // Another module's fakes; testing-only-in-tests keeps them out of production code.
+          "^packages/core/src/[^/]+/testing/index\\.ts$",
+        ],
       },
+    },
+    {
+      name: "testing-only-in-tests",
+      comment:
+        "Fakes in a module's testing/ folder are for tests: only test files and other testing/ folders import them.",
+      severity: "error",
+      from: {
+        path: "^packages/[^/]+/src/",
+        pathNot: ["\\.(test|int\\.test|spec)\\.ts$", "/testing/"],
+      },
+      to: { path: "^packages/[^/]+/src/.+/testing/" },
     },
     {
       name: "not-to-test-files",

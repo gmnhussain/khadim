@@ -21,7 +21,7 @@ Slice 1a has no tables. The loop reads and writes through an injected run store 
 | LLM call | `LlmCall` | In memory | Provider, model, attempt number, tokens (input, output, cache write, cache read), cost, latency, stop reason, mapped problem if it failed (BR-23, BR-24) |
 | Tool call | `ToolCall` | In memory | Tool name, validated input, result or error result, policy applied, timing (BR-23) |
 | Tool | `ToolDefinition` | Code | Name, description, Zod input schema, handler, effect tier |
-| Tool policy | `ToolPolicy` | Validated configuration object | `auto`, `propose` or `approve`, limits and bound arguments, per task (ADR-0011) |
+| Tool policy | `ToolPolicy` | Validated configuration object | `auto`, `propose` or `approve`, with per-run and per-day call limits, by tool name; each task lists its tools (ADR-0011). Arguments bound by the run arrive with their first tool, in Phase 5 |
 | Model catalog and routes | `modelCatalog`, `ModelRoute` | Validated configuration object | Per model: provider, id, capabilities, context limit, tiered prices. Per task: route, effort, `maxAttempts` (plan D-1, D-9) |
 | Message and content parts | `llm.types` | Code | Provider-neutral: text, tool call, tool result, and an opaque reasoning part the adapter returns to the same provider unchanged |
 | Pending action | `PendingAction` | Not built | 1a only signals that a step created one, through an injected dependency; the entity arrives with approvals (Phase 3) |
