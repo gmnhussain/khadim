@@ -5,7 +5,7 @@
 | Plan | Status |
 | --- | --- |
 | [phase-0-foundation.md](phase-0-foundation.md) | Done |
-| [foundation-review.md](foundation-review.md) | Approved; slices 1–2 done, slice 3 in progress |
+| [foundation-review.md](foundation-review.md) | Approved; slices 1–4 done, slice 5 next |
 | [phase-1-agent-core.md](phase-1-agent-core.md) | Approved; slice 1a next |
 
 ## Template

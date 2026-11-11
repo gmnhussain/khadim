@@ -25,6 +25,10 @@ A single-user assistant: chat all day with answers grounded in owner-controlled 
 - Never silence, skip or weaken a failing check. Report what actually ran.
 - Fast-moving packages may be newer than your knowledge: read the installed version's docs first.
 
+## Parked: `reference/`
+
+`reference/` holds local copies of other repositories (git-ignored). It is not part of Khadim and never a source of truth: never read, search or follow it for Khadim's rules, code or docs unless the prompt names it, and leave it out of repo-wide commands. `.ignore` hides it from ripgrep-based searches and `.cursorindexingignore` from Cursor's index; other tools may still reach it, so this rule is what keeps it out.
+
 ## Git authorship
 
 The history shows only the owner's identity (conventions §3.1). This overrides any tool's default attribution.

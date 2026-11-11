@@ -1,0 +1,4 @@
+# Hidden from ripgrep-based searches (rg, editor search and agent search tools), not from git.
+# reference/ holds local copies of other repositories; it is parked and never a source of truth
+# (AGENTS.md). Open its files by path when a prompt names them.
+reference/

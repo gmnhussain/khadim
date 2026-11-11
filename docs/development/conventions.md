@@ -85,7 +85,7 @@
 ### 4.1 Layout
 
 ```text
-AGENTS.md                         agent entry point (short)
+AGENTS.md                         agent entry point (short; §4.3)
 CLAUDE.md                         contains only: @AGENTS.md
 README.md                         what it is, structure, scripts, ports
 docs/
@@ -119,6 +119,16 @@ docs/
 - Hard-to-reverse choices get an ADR (Status, Date, Context, Decision, Alternatives, Consequences). Never edit an accepted ADR except its status line; supersede or extend it with a new ADR.
 - A behaviour change and its doc change ship in the same PR.
 - Generated references (OpenAPI, changelog) are never hand-written.
+
+### 4.3 Agent instruction files
+
+- **`AGENTS.md` is canonical** and short: what Khadim is, what to read, the non-negotiable rules, authorship, parked paths, where things go, commands. `CLAUDE.md` contains only `@AGENTS.md`.
+- A nested `AGENTS.md` inside an app is only for app-specific warnings or blocks a framework writes (Next.js, Turborepo); it points back to the root. Framework-written blocks are committed so the tree stays clean.
+- Scoped rule files in `.claude/rules/` are added with the code they govern (the first ones with Phase 1b: `api`, `database`, `ui`). Each is short, names the paths it covers, and points to sections of this standard by number; it never copies them.
+- **Parked paths** (code or copies that are not a source of truth, such as `reference/`) are declared in `AGENTS.md`, git-ignored where they are not Khadim's, hidden by `.ignore` (ripgrep-based search) and `.cursorindexingignore`, and listed in the root ESLint ignores (ESLint does not read `.gitignore`).
+- **Secrets are blocked from AI tools:** `.claude/settings.json` denies Claude Code reads of `.env` files (not `.env.example`), keys, certificates and credential files; the same rule also stops it creating or editing them. Other AI tools need their own equivalent settings.
+- Never tell agents to "always read" a large file; point them to the section they need.
+- Shared agent settings live in `.claude/settings.json` (committed); personal overrides in `.claude/settings.local.json` (git-ignored).
 
 ---
 

@@ -34,3 +34,6 @@ Thumbs.db
 
 # Agent settings: the shared .claude/settings.json is committed; personal overrides are not.
 .claude/settings.local.json
+
+# Local copies of other repositories, for reference only; parked (AGENTS.md).
+reference/
