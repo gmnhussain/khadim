@@ -271,7 +271,7 @@ Each module exposes its public API through `index.ts`; other modules import only
 | Editor | `.editorconfig` (UTF-8, LF, 2 spaces), `.gitattributes` (`* text=auto eol=lf`). |
 | Tests | Vitest preset with `unit` and `integration` projects (`vitest run --project <name>`) and a per-file 100% coverage threshold on `src/**/*.rules.ts` that fails the run. |
 | Boundaries | dependency-cruiser. |
-| Updates | Dependabot weekly; `pnpm audit --prod` in CI; Turbo and Next.js telemetry off in CI. |
+| Updates | Dependabot weekly, with a `cooldown` of 14 days on npm and GitHub Actions version updates, equal to `minimumReleaseAge` so it never proposes a version the install refuses; the two change together. Security updates have no cooldown: a security PR for a version inside the window needs an exclusion line, as under "Release age" (KP-25). `pnpm audit --prod` in CI; Turbo and Next.js telemetry off in CI. |
 | CI supply chain | GitHub Actions pinned to full commit SHAs with the version in a trailing comment; container images run from workflow steps pinned by digest with the version in a comment, updated by hand. Dependabot updates the action SHAs. |
 | Secrets | gitleaks scans the full git history in CI on every PR and push; enable GitHub push protection when the repository plan offers it. |
 

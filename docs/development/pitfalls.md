@@ -14,6 +14,7 @@ Add a pitfall when one is hit, or found by a probe, and is likely to be hit agai
 | KP-04 | `pnpm install` can move unrelated transitive versions. | Read the lockfile diff after every install; restore it and re-add only your change if anything else moved (conventions §6). |
 | KP-05 | Mixed line endings on Windows. | `.gitattributes` and `.editorconfig` already set LF; scripted edits keep each file's endings. |
 | KP-06 | A stopped shell can leave a Node child holding a port. | Check the port before and after; never kill a process you did not start (conventions §2.3). |
+| KP-25 | Dependabot's `cooldown` covers version updates only. A security update can propose a version younger than 14 days, which pnpm then refuses to install (`minimumReleaseAge`). Found in GitHub's Dependabot options reference (2026-11-12). | Add an exact `name@version` line to `minimumReleaseAgeExclude` with the reason and a removal date (conventions §6). |
 | KP-18 | The npm audit feed can lag days behind a project's own security advisories, so a passing `pnpm audit` does not prove a version is safe. Found with Vite GHSA-p4f5-76q4-ffq7 (increments 1–2). | When every maintained line of a package is patched on the same day, check that project's advisories page before choosing a version; take the patch with an exact release-age exclusion, its reason and removal date (conventions §6). |
 
 ## TypeScript and packages

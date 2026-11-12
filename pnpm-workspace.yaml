@@ -9,7 +9,8 @@ engineStrict: true
 
 # Supply chain (conventions §6): a version is installed only after it has been public for two
 # weeks (minutes), so a hijacked release is usually found and pulled first. pnpm checks new
-# resolutions only; versions already in the lockfile are not re-checked.
+# resolutions only; versions already in the lockfile are not re-checked. Dependabot's
+# `cooldown` (.github/dependabot.yml) waits the same 14 days: change both together.
 minimumReleaseAge: 20160
 
 # Exact versions that are inside the window but needed now. Remove each line on its date.

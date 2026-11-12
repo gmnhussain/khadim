@@ -8,6 +8,13 @@ updates:
       day: monday
       timezone: Asia/Dhaka
     open-pull-requests-limit: 10
+    # Wait as long as pnpm does: 14 days, equal to minimumReleaseAge (20160 minutes) in
+    # pnpm-workspace.yaml, so Dependabot never proposes a version the install refuses. Change
+    # both together. Cooldown covers version updates only, not security updates (KP-25).
+    # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference#cooldown-
+    # The docs list npm and Yarn; pnpm lockfiles are handled by this npm ecosystem.
+    cooldown:
+      default-days: 14
     commit-message:
       prefix: chore
       include: scope
@@ -22,6 +29,13 @@ updates:
       interval: weekly
       day: monday
       timezone: Asia/Dhaka
+    # Wait as long as pnpm does: 14 days, equal to minimumReleaseAge (20160 minutes) in
+    # pnpm-workspace.yaml, so Dependabot never proposes a version the install refuses. Change
+    # both together. Cooldown covers version updates only, not security updates (KP-25).
+    # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference#cooldown-
+    # GitHub Actions supports default-days only, not the semver keys.
+    cooldown:
+      default-days: 14
     commit-message:
       prefix: ci
 
