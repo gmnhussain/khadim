@@ -1,4 +1,10 @@
-import type { LlmUsage } from "../llm";
+import {
+  findMissingCapability,
+  type LlmCapabilities,
+  type LlmErrorReason,
+  type LlmTaskNeed,
+  type LlmUsage,
+} from "../llm";
 import type { ToolEffect } from "../tools";
 import type { AgentProblem } from "./agent.errors";
 import type { RunLimits, RunTotals } from "./agent.types";
@@ -83,6 +89,36 @@ export function findReachedLimit(totals: RunTotals, limits: RunLimits): AgentPro
     return "RUN_TIME_LIMIT";
   }
   return undefined;
+}
+
+/** What the loop knows about one route at startup. */
+export interface LoopRouteCheck {
+  /** Whether `providers` holds an adapter for the route's provider. */
+  readonly hasAdapter: boolean;
+  /** The routed model's capabilities, from the catalog. */
+  readonly capabilities: LlmCapabilities;
+  /** Whether the tool registry offers the task at least one tool. */
+  readonly hasTools: boolean;
+}
+
+/** Why the loop cannot run a route, and the need the model cannot meet when that is why. */
+export interface LoopRouteFinding {
+  readonly reason: Extract<LlmErrorReason, "no_adapter" | "missing_capability">;
+  readonly need?: LlmTaskNeed | undefined;
+}
+
+/**
+ * Checks that the loop can run a route: an adapter is registered for its provider, and the
+ * model streams, which the loop does on every call, and supports tools when the task has any
+ * (review fixes, D-4; findings L1, L3, L10).
+ */
+export function findLoopRouteProblem(check: LoopRouteCheck): LoopRouteFinding | undefined {
+  if (!check.hasAdapter) {
+    return { reason: "no_adapter" };
+  }
+  const needs: readonly LlmTaskNeed[] = check.hasTools ? ["streaming", "tools"] : ["streaming"];
+  const need = findMissingCapability(check.capabilities, needs);
+  return need === undefined ? undefined : { reason: "missing_capability", need };
 }
 
 /**

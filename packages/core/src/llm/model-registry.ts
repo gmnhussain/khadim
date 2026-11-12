@@ -2,17 +2,20 @@ import * as z from "zod";
 
 import { namedRecordSchema, TASK_NAME_PATTERN } from "../shared";
 
-import { LlmError, type LlmProblem } from "./llm.errors";
+import { LlmError, type LlmErrorReason, type LlmProblem } from "./llm.errors";
 import {
   LLM_EFFORTS,
   llmCapabilitiesSchema,
   type LlmCapabilities,
   type LlmEffort,
-  type LlmTaskNeed,
   type PriceTier,
   priceTierSchema,
 } from "./llm.types";
-import { findRouteProblem } from "./model-routing.rules";
+import {
+  findRouteProblem,
+  NO_TASK_REQUIREMENTS,
+  type TaskRequirements,
+} from "./model-routing.rules";
 import { arePriceTiersValid } from "./usage.rules";
 
 /** Plan D-9 rule 3: attempts per call, counting the first try. */
@@ -26,6 +29,8 @@ const catalogModelSchema = z.strictObject({
   provider: z.string().min(1),
   id: z.string().min(1),
   capabilities: llmCapabilitiesSchema,
+  /** The most output the model can write in one call (review fixes, D-3). */
+  maxOutputTokens: z.int().min(MIN_POSITIVE),
   priceTiers: z.array(priceTierSchema).refine(arePriceTiersValid, {
     message: "Price tiers must rise, and only the last has no maxPromptTokens",
   }),
@@ -58,8 +63,11 @@ export interface ModelRegistryDependencies {
   readonly catalog: unknown;
   /** Providers with valid configuration; only they may receive owner data (BR-27). */
   readonly enabledProviderIds: readonly string[];
-  /** What each task needs from its model (BR-25). A task not listed needs nothing. */
-  readonly needsByTask: ReadonlyMap<string, readonly LlmTaskNeed[]>;
+  /**
+   * What each task needs from its model (BR-25; review fixes, D-3). Every task listed must have
+   * a route; a task not listed needs nothing.
+   */
+  readonly requirementsByTask: ReadonlyMap<string, TaskRequirements>;
 }
 
 /** Everything a model call for a task needs: where it goes, its limits and its prices. */
@@ -75,10 +83,15 @@ export interface ResolvedModelRoute {
   readonly priceTiers: readonly PriceTier[];
 }
 
-/** Result of `resolveRoute`. */
+/** Result of `resolveRoute`. A task without a route says so, for the logs (finding L11). */
 export type ModelRouteResolution =
   | { readonly ok: true; readonly value: ResolvedModelRoute }
-  | { readonly ok: false; readonly problem: Extract<LlmProblem, "LLM_ROUTE_INVALID"> };
+  | {
+      readonly ok: false;
+      readonly problem: Extract<LlmProblem, "LLM_ROUTE_INVALID">;
+      readonly task: string;
+      readonly reason: Extract<LlmErrorReason, "no_route">;
+    };
 
 function modelKey(provider: string, id: string): string {
   return JSON.stringify([provider, id]);
@@ -113,15 +126,21 @@ export function createModelRegistry(dependencies: ModelRegistryDependencies) {
   const routeByTask = new Map<string, ResolvedModelRoute>();
   for (const [task, route] of Object.entries(catalog.routes)) {
     const model = modelByKey.get(modelKey(route.provider, route.model));
+    if (model === undefined) {
+      throw new LlmError("LLM_ROUTE_INVALID", { task, reason: "unknown_model" });
+    }
     const finding = findRouteProblem({
-      capabilities: model?.capabilities,
+      capabilities: model.capabilities,
+      modelMaxOutputTokens: model.maxOutputTokens,
+      routeMaxOutputTokens: route.maxOutputTokens,
       isProviderEnabled: enabledProviderSet.has(route.provider),
-      needs: dependencies.needsByTask.get(task) ?? [],
+      requirements: dependencies.requirementsByTask.get(task) ?? NO_TASK_REQUIREMENTS,
     });
-    if (finding !== undefined || model === undefined) {
+    if (finding !== undefined) {
       throw new LlmError("LLM_ROUTE_INVALID", {
         task,
-        reason: finding?.refusal ?? "unknown_model",
+        reason: finding.refusal,
+        ...(finding.need === undefined ? {} : { need: finding.need }),
       });
     }
     routeByTask.set(task, {
@@ -137,15 +156,27 @@ export function createModelRegistry(dependencies: ModelRegistryDependencies) {
     });
   }
 
+  // A task with requirements and no route could never run: stop at startup (finding L2).
+  for (const task of dependencies.requirementsByTask.keys()) {
+    if (!routeByTask.has(task)) {
+      throw new LlmError("LLM_ROUTE_INVALID", { task, reason: "no_route" });
+    }
+  }
+
   /** The route of a task; a task without a route cannot run. */
   function resolveRoute(task: string): ModelRouteResolution {
     const route = routeByTask.get(task);
     return route === undefined
-      ? { ok: false, problem: "LLM_ROUTE_INVALID" }
+      ? { ok: false, problem: "LLM_ROUTE_INVALID", task, reason: "no_route" }
       : { ok: true, value: route };
   }
 
-  return { resolveRoute };
+  /** Every valid route, for the checks a composition root makes across modules. */
+  function listRoutes(): readonly ResolvedModelRoute[] {
+    return [...routeByTask.values()];
+  }
+
+  return { resolveRoute, listRoutes };
 }
 
 /** The model registry, created once in a composition root. */

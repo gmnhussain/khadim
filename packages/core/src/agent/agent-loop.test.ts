@@ -3,6 +3,7 @@ import * as z from "zod";
 
 import {
   createModelRegistry,
+  type LlmCapabilities,
   LlmError,
   type LlmProvider,
   type LlmReasoningPart,
@@ -16,7 +17,7 @@ import {
   FAKE_LLM_USAGE,
   type FakeLlmStep,
   SAMPLE_MODEL_CATALOG,
-  SAMPLE_NEEDS_BY_TASK,
+  SAMPLE_TASK_REQUIREMENTS,
 } from "../llm/testing";
 import { createFixedClock } from "../shared/testing";
 import {
@@ -54,6 +55,8 @@ interface FixtureOptions {
   readonly onSleep?: (delayMs: number) => void;
   readonly provider?: LlmProvider;
   readonly enabledProviderKey?: string;
+  readonly catalog?: unknown;
+  readonly extraTasks?: Record<string, readonly string[]>;
 }
 
 function createFixture(options: FixtureOptions) {
@@ -89,6 +92,7 @@ function createFixture(options: FixtureOptions) {
           "publish_note",
           ...extraTools.map((tool) => tool.name),
         ],
+        ...options.extraTasks,
       },
     },
     countCallsToday: createInMemoryToolCallCounter().countCallsToday,
@@ -104,9 +108,9 @@ function createFixture(options: FixtureOptions) {
       [options.enabledProviderKey ?? "anthropic", options.provider ?? fakeLlm.provider],
     ]),
     modelRegistry: createModelRegistry({
-      catalog: SAMPLE_MODEL_CATALOG,
+      catalog: options.catalog ?? SAMPLE_MODEL_CATALOG,
       enabledProviderIds: ["anthropic"],
-      needsByTask: SAMPLE_NEEDS_BY_TASK,
+      requirementsByTask: SAMPLE_TASK_REQUIREMENTS,
     }),
     toolRegistry,
     runStore,
@@ -1256,14 +1260,87 @@ describe("runAgent: routes", () => {
     expect(result.outcome).toEqual({ status: "failed", problem: "LLM_ROUTE_INVALID" });
     expect(fixture.fakeLlm.requests).toEqual([]);
   });
+});
 
-  it("fails with LLM_ROUTE_INVALID when the route's provider has no adapter (BR-27)", async () => {
-    const fixture = createFixture({ steps: [], enabledProviderKey: "openai" });
+describe("createAgentLoop: startup check across routes, adapters and tools (review fixes, D-4)", () => {
+  /** The sample catalog with Opus, which routes eval_grader, changed. */
+  function catalogWithOpus(capabilities: Partial<LlmCapabilities>) {
+    return {
+      ...SAMPLE_MODEL_CATALOG,
+      models: SAMPLE_MODEL_CATALOG.models.map((model) =>
+        model.id === "claude-opus-5-5"
+          ? { ...model, capabilities: { ...model.capabilities, ...capabilities } }
+          : model,
+      ),
+    };
+  }
 
-    const result = await fixture.run();
+  function captureLlmError(action: () => unknown): LlmError {
+    try {
+      action();
+    } catch (error) {
+      if (error instanceof LlmError) {
+        return error;
+      }
+      throw error;
+    }
+    throw new Error("expected an LlmError");
+  }
 
-    expect(result.outcome).toEqual({ status: "failed", problem: "LLM_ROUTE_INVALID" });
-    expect(fixture.fakeLlm.requests).toEqual([]);
+  it("stops when a routed provider has no adapter (L3, BR-27)", () => {
+    const error = captureLlmError(() => createFixture({ steps: [], enabledProviderKey: "openai" }));
+
+    expect(error).toMatchObject({
+      problem: "LLM_ROUTE_INVALID",
+      task: "chat",
+      reason: "no_adapter",
+    });
+  });
+
+  it("stops when a routed model cannot stream, though its task does not list streaming (L1)", () => {
+    const error = captureLlmError(() =>
+      createFixture({ steps: [], catalog: catalogWithOpus({ supportsStreaming: false }) }),
+    );
+
+    expect(error).toMatchObject({
+      task: "eval_grader",
+      reason: "missing_capability",
+      need: "streaming",
+    });
+  });
+
+  it("stops when a task with tools routes to a model without tool support (L10)", () => {
+    const error = captureLlmError(() =>
+      createFixture({
+        steps: [],
+        catalog: catalogWithOpus({ supportsTools: false }),
+        extraTasks: { eval_grader: ["read_note"] },
+      }),
+    );
+
+    expect(error).toMatchObject({
+      task: "eval_grader",
+      reason: "missing_capability",
+      need: "tools",
+    });
+  });
+
+  it("accepts a model without tool support for a task with no tools", () => {
+    expect(() =>
+      createFixture({ steps: [], catalog: catalogWithOpus({ supportsTools: false }) }),
+    ).not.toThrow();
+  });
+
+  it("stops when a task has tools but no route", () => {
+    const error = captureLlmError(() =>
+      createFixture({ steps: [], extraTasks: { summarise: ["read_note"] } }),
+    );
+
+    expect(error).toMatchObject({ task: "summarise", reason: "no_route" });
+  });
+
+  it("accepts a configured task with no tools and no route", () => {
+    expect(() => createFixture({ steps: [], extraTasks: { summarise: [] } })).not.toThrow();
   });
 });
 

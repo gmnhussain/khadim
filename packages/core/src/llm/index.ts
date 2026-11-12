@@ -1,7 +1,9 @@
 export {
+  LLM_ERROR_REASONS,
   LLM_PROBLEMS,
   LlmError,
   type LlmErrorOptions,
+  type LlmErrorReason,
   type LlmProblem,
   STOP_REASON_PROBLEMS,
 } from "./llm.errors";
@@ -38,6 +40,12 @@ export {
   type ModelRouteResolution,
   type ResolvedModelRoute,
 } from "./model-registry";
+export {
+  findMissingCapability,
+  NO_TASK_REQUIREMENTS,
+  type RouteRefusal,
+  type TaskRequirements,
+} from "./model-routing.rules";
 export {
   decideRetry,
   isEmittedContent,

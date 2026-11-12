@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { LlmCapabilities } from "../llm";
 import {
   addCallUsage,
   addIteration,
@@ -9,6 +10,7 @@ import {
   computeRunningMs,
   countCallTokens,
   DEFAULT_RUN_LIMITS,
+  findLoopRouteProblem,
   findReachedLimit,
   ZERO_RUN_TOTALS,
 } from "./agent.rules";
@@ -109,6 +111,56 @@ describe("computeRemainingRunMs and capTimeoutMs", () => {
       expect(capTimeoutMs(routeTimeout, remaining)).toBe(expected);
     },
   );
+});
+
+describe("findLoopRouteProblem (review fixes, D-4)", () => {
+  const FULL: LlmCapabilities = {
+    supportsTools: true,
+    supportsStreaming: true,
+    supportsImages: false,
+    supportsStructuredOutput: false,
+    supportsPromptCaching: true,
+    maxContextTokens: 200_000,
+  };
+
+  it("finds nothing for a streaming model with an adapter", () => {
+    expect(
+      findLoopRouteProblem({ hasAdapter: true, capabilities: FULL, hasTools: true }),
+    ).toBeUndefined();
+  });
+
+  it("reports a route without an adapter first", () => {
+    expect(
+      findLoopRouteProblem({
+        hasAdapter: false,
+        capabilities: { ...FULL, supportsStreaming: false },
+        hasTools: false,
+      }),
+    ).toEqual({ reason: "no_adapter" });
+  });
+
+  it("needs streaming for every route, tools or not", () => {
+    expect(
+      findLoopRouteProblem({
+        hasAdapter: true,
+        capabilities: { ...FULL, supportsStreaming: false },
+        hasTools: false,
+      }),
+    ).toEqual({ reason: "missing_capability", need: "streaming" });
+  });
+
+  it.each([
+    [true, { reason: "missing_capability", need: "tools" }],
+    [false, undefined],
+  ])("for a model without tools, with task tools %s, reports %j", (hasTools, expected) => {
+    expect(
+      findLoopRouteProblem({
+        hasAdapter: true,
+        capabilities: { ...FULL, supportsTools: false },
+        hasTools,
+      }),
+    ).toEqual(expected);
+  });
 });
 
 describe("findReachedLimit", () => {

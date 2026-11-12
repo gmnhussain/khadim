@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { LlmError } from "./llm.errors";
-import type { LlmTaskNeed } from "./llm.types";
 import { createModelRegistry, modelCatalogSchema } from "./model-registry";
-import { SAMPLE_MODEL_CATALOG, SAMPLE_NEEDS_BY_TASK } from "./testing";
+import type { TaskRequirements } from "./model-routing.rules";
+import { SAMPLE_MODEL_CATALOG, SAMPLE_TASK_REQUIREMENTS } from "./testing";
 
 function firstSampleModel() {
   const [model] = SAMPLE_MODEL_CATALOG.models;
@@ -19,15 +19,22 @@ function create(
   catalog: unknown = SAMPLE_MODEL_CATALOG,
   options: {
     enabledProviderIds?: readonly string[];
-    needsByTask?: ReadonlyMap<string, readonly LlmTaskNeed[]>;
+    requirementsByTask?: ReadonlyMap<string, TaskRequirements>;
   } = {},
 ) {
   return createModelRegistry({
     catalog,
     enabledProviderIds: options.enabledProviderIds ?? ["anthropic"],
-    needsByTask: options.needsByTask ?? SAMPLE_NEEDS_BY_TASK,
+    requirementsByTask: options.requirementsByTask ?? SAMPLE_TASK_REQUIREMENTS,
   });
 }
+
+/** Only chat's requirements, for catalogs that route chat alone. */
+const CHAT_ONLY = {
+  requirementsByTask: new Map([
+    ["chat", SAMPLE_TASK_REQUIREMENTS.get("chat") ?? { needs: [], minContextTokens: 0 }],
+  ]),
+};
 
 function captureLlmError(action: () => unknown): LlmError {
   try {
@@ -219,15 +226,20 @@ describe("createModelRegistry", () => {
 
   it("resolves a route without an effort", () => {
     const { effort: _effort, ...route } = SAMPLE_MODEL_CATALOG.routes.chat;
-    const registry = create({ ...SAMPLE_MODEL_CATALOG, routes: { chat: route } });
+    const registry = create({ ...SAMPLE_MODEL_CATALOG, routes: { chat: route } }, CHAT_ONLY);
 
     expect(registry.resolveRoute("chat")).toMatchObject({ ok: true, value: { effort: undefined } });
   });
 
   it.each(["summarise", "constructor", "__proto__"])(
-    "returns LLM_ROUTE_INVALID for the task %s, which has no route",
+    "returns LLM_ROUTE_INVALID, naming the task and no_route, for the task %s (L11)",
     (task) => {
-      expect(create().resolveRoute(task)).toEqual({ ok: false, problem: "LLM_ROUTE_INVALID" });
+      expect(create().resolveRoute(task)).toEqual({
+        ok: false,
+        problem: "LLM_ROUTE_INVALID",
+        task,
+        reason: "no_route",
+      });
     },
   );
 
@@ -253,7 +265,7 @@ describe("createModelRegistry", () => {
         models: [HAIKU, { ...HAIKU, provider: "local" }],
         routes: { chat: { provider: "local", model: HAIKU.id } },
       },
-      { enabledProviderIds: ["local"] },
+      { ...CHAT_ONLY, enabledProviderIds: ["local"] },
     );
 
     expect(registry.resolveRoute("chat")).toMatchObject({ ok: true, value: { provider: "local" } });
@@ -292,7 +304,66 @@ describe("createModelRegistry", () => {
       problem: "LLM_ROUTE_INVALID",
       task: "chat",
       reason: "missing_capability",
+      need: "tools",
     });
+  });
+
+  it("stops when a task with requirements has no route (L2)", () => {
+    const error = captureLlmError(() =>
+      create({ ...SAMPLE_MODEL_CATALOG, routes: { chat: SAMPLE_MODEL_CATALOG.routes.chat } }),
+    );
+
+    expect(error).toMatchObject({
+      problem: "LLM_ROUTE_INVALID",
+      task: "draft_post",
+      reason: "no_route",
+    });
+  });
+
+  it("stops when a route asks for more output than the model can write (L5)", () => {
+    const error = captureLlmError(() =>
+      create(
+        {
+          models: [{ ...HAIKU, maxOutputTokens: 8_000 }],
+          routes: { chat: SAMPLE_MODEL_CATALOG.routes.chat },
+        },
+        CHAT_ONLY,
+      ),
+    );
+
+    expect(error).toMatchObject({ task: "chat", reason: "output_over_model_limit" });
+  });
+
+  it("stops when the model's context is smaller than the task needs (L4, D-3)", () => {
+    const error = captureLlmError(() =>
+      create(
+        {
+          models: [{ ...HAIKU, capabilities: { ...HAIKU.capabilities, maxContextTokens: 32_000 } }],
+          routes: { chat: SAMPLE_MODEL_CATALOG.routes.chat },
+        },
+        CHAT_ONLY,
+      ),
+    );
+
+    expect(error).toMatchObject({ task: "chat", reason: "context_too_small" });
+  });
+
+  it("refuses a catalog model without a maximum output (D-3)", () => {
+    const { maxOutputTokens: _maxOutputTokens, ...model } = HAIKU;
+
+    const error = captureLlmError(() =>
+      create({ models: [model], routes: { chat: SAMPLE_MODEL_CATALOG.routes.chat } }, CHAT_ONLY),
+    );
+
+    expect(error.reason).toBe("catalog_malformed");
+  });
+
+  it("lists every route it validated", () => {
+    expect(
+      create()
+        .listRoutes()
+        .map((route) => route.task),
+    ).toEqual(["chat", "draft_post", "draft_reply", "eval_grader"]);
   });
 
   it("accepts a model without tools for a task that needs none", () => {
@@ -301,7 +372,7 @@ describe("createModelRegistry", () => {
         models: [{ ...HAIKU, capabilities: { ...HAIKU.capabilities, supportsTools: false } }],
         routes: { summarise: SAMPLE_MODEL_CATALOG.routes.chat },
       },
-      { needsByTask: new Map() },
+      { requirementsByTask: new Map() },
     );
 
     expect(registry.resolveRoute("summarise").ok).toBe(true);

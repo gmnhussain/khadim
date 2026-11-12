@@ -260,7 +260,12 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies) {
       : { ok: true, value: serialized };
   }
 
-  return { listTools, resolveToolCalls, executeToolCall };
+  /** Every task the configuration lists, with or without tools. */
+  function listTasks(): readonly string[] {
+    return [...classifiedByTask.keys()];
+  }
+
+  return { listTools, listTasks, resolveToolCalls, executeToolCall };
 }
 
 /** The tool registry, created once in a composition root. */

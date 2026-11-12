@@ -1,5 +1,6 @@
-import type { LlmCapabilities, LlmTaskNeed } from "../llm.types";
+import type { LlmCapabilities } from "../llm.types";
 import type { ModelCatalogInput } from "../model-registry";
+import type { TaskRequirements } from "../model-routing.rules";
 
 const CLAUDE_CAPABILITIES: LlmCapabilities = {
   supportsTools: true,
@@ -9,6 +10,12 @@ const CLAUDE_CAPABILITIES: LlmCapabilities = {
   supportsPromptCaching: true,
   maxContextTokens: 1_000_000,
 };
+
+/**
+ * The most output per call, for tests only. The real value of each model is confirmed against
+ * the provider's docs with the catalog file in 1b (review fixes, D-3).
+ */
+const SAMPLE_MAX_OUTPUT_TOKENS = 64_000;
 
 /**
  * A catalog with the values of plan D-1, for tests only. Prices are micro-USD per million
@@ -21,6 +28,7 @@ export const SAMPLE_MODEL_CATALOG = {
       provider: "anthropic",
       id: "claude-haiku-5-5",
       capabilities: CLAUDE_CAPABILITIES,
+      maxOutputTokens: SAMPLE_MAX_OUTPUT_TOKENS,
       priceTiers: [
         {
           maxPromptTokens: 100_000,
@@ -41,6 +49,7 @@ export const SAMPLE_MODEL_CATALOG = {
       provider: "anthropic",
       id: "claude-sonnet-5-5",
       capabilities: CLAUDE_CAPABILITIES,
+      maxOutputTokens: SAMPLE_MAX_OUTPUT_TOKENS,
       priceTiers: [
         {
           inputMicroUsdPerMillionTokens: 2_000_000,
@@ -54,6 +63,7 @@ export const SAMPLE_MODEL_CATALOG = {
       provider: "anthropic",
       id: "claude-opus-5-5",
       capabilities: CLAUDE_CAPABILITIES,
+      maxOutputTokens: SAMPLE_MAX_OUTPUT_TOKENS,
       priceTiers: [
         {
           inputMicroUsdPerMillionTokens: 4_000_000,
@@ -72,9 +82,9 @@ export const SAMPLE_MODEL_CATALOG = {
   },
 } satisfies ModelCatalogInput;
 
-/** What the sample tasks need from their models. */
-export const SAMPLE_NEEDS_BY_TASK: ReadonlyMap<string, readonly LlmTaskNeed[]> = new Map([
-  ["chat", ["tools", "streaming"]],
-  ["draft_post", ["tools"]],
-  ["draft_reply", ["tools"]],
+/** What the sample tasks need from their models; the context sizes are test values. */
+export const SAMPLE_TASK_REQUIREMENTS: ReadonlyMap<string, TaskRequirements> = new Map([
+  ["chat", { needs: ["tools", "streaming"], minContextTokens: 100_000 }],
+  ["draft_post", { needs: ["tools"], minContextTokens: 50_000 }],
+  ["draft_reply", { needs: ["tools"], minContextTokens: 50_000 }],
 ]);

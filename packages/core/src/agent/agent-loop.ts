@@ -27,6 +27,7 @@ import {
   capTimeoutMs,
   computeRemainingRunMs,
   computeRunningMs,
+  findLoopRouteProblem,
   findReachedLimit,
   ZERO_RUN_TOTALS,
 } from "./agent.rules";
@@ -104,6 +105,29 @@ function joinText(content: readonly LlmAssistantPart[]): string {
 export function createAgentLoop(dependencies: AgentLoopDependencies) {
   const { clock, limits, modelRegistry, runStore, toolRegistry } = dependencies;
 
+  // One startup check across the routes, the adapters and the tools, so a route the loop could
+  // never run stops the app instead of failing every run (BR-25; review fixes, D-4).
+  for (const route of modelRegistry.listRoutes()) {
+    const finding = findLoopRouteProblem({
+      hasAdapter: dependencies.providers.has(route.provider),
+      capabilities: route.capabilities,
+      hasTools: toolRegistry.listTools(route.task).length > 0,
+    });
+    if (finding !== undefined) {
+      throw new LlmError("LLM_ROUTE_INVALID", {
+        task: route.task,
+        reason: finding.reason,
+        ...(finding.need === undefined ? {} : { need: finding.need }),
+      });
+    }
+  }
+  for (const task of toolRegistry.listTasks()) {
+    const hasTools = toolRegistry.listTools(task).length > 0;
+    if (hasTools && !modelRegistry.resolveRoute(task).ok) {
+      throw new LlmError("LLM_ROUTE_INVALID", { task, reason: "no_route" });
+    }
+  }
+
   async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     const { runId, task, cancelSignal } = input;
     // Read through a function: after one check, TypeScript would treat `aborted` as fixed,
@@ -138,7 +162,8 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
     const route = routeResolution.value;
     const routedProvider = dependencies.providers.get(route.provider);
     if (routedProvider === undefined) {
-      return fail("LLM_ROUTE_INVALID");
+      // Impossible: the startup check above refuses a route without an adapter.
+      throw new Error(`no adapter for a route checked at startup: ${route.provider}`);
     }
     // A new constant keeps the checked type inside the functions declared below.
     const provider: LlmProvider = routedProvider;

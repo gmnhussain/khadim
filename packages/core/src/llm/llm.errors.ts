@@ -1,4 +1,4 @@
-import type { LlmStopReason, LlmUsage } from "./llm.types";
+import type { LlmStopReason, LlmTaskNeed, LlmUsage } from "./llm.types";
 
 /** Every problem the llm module can report (features/agent.md, "Problem codes"). */
 export const LLM_PROBLEMS = [
@@ -39,6 +39,33 @@ export const STOP_REASON_PROBLEMS: Record<LlmStopReason, LlmProblem | undefined>
   context_exceeded: "LLM_CONTEXT_EXCEEDED",
 };
 
+/**
+ * Every reason code an `LlmError` can carry, for logs and the startup message (finding L17). A
+ * closed list, so a typo fails to compile and log filters cannot miss a new reason.
+ */
+export const LLM_ERROR_REASONS = [
+  // The catalog and its routes, checked at startup (BR-25, BR-27).
+  "catalog_malformed",
+  "duplicate_model",
+  "unknown_model",
+  "provider_disabled",
+  "missing_capability",
+  "context_too_small",
+  "output_over_model_limit",
+  "output_not_below_context",
+  "no_route",
+  "no_adapter",
+  // A request or response an adapter cannot map.
+  "invalid_reasoning_payload",
+  "unexpected_content_block",
+  "unexpected_stop_reason",
+  "invalid_tool_schema",
+  "untyped_tool_schema",
+] as const;
+
+/** A reason code of an `LlmError`. */
+export type LlmErrorReason = (typeof LLM_ERROR_REASONS)[number];
+
 /** Details of an LLM error. None of them holds prompt or completion text. */
 export interface LlmErrorOptions {
   /** How long the provider asked to wait, on `LLM_RATE_LIMITED` (plan D-9 rule 1). */
@@ -48,7 +75,9 @@ export interface LlmErrorOptions {
   /** The task whose route is invalid, on `LLM_ROUTE_INVALID`. */
   readonly task?: string | undefined;
   /** A short reason code for logs, such as `unknown_model`. */
-  readonly reason?: string | undefined;
+  readonly reason?: LlmErrorReason | undefined;
+  /** The need the routed model cannot meet, on `missing_capability` (finding L11). */
+  readonly need?: LlmTaskNeed | undefined;
   /** The vendor's error, for logs only; it never crosses the port any other way. */
   readonly cause?: unknown;
 }
@@ -59,7 +88,8 @@ export class LlmError extends Error {
   readonly retryAfterMs: number | undefined;
   readonly usage: LlmUsage | undefined;
   readonly task: string | undefined;
-  readonly reason: string | undefined;
+  readonly reason: LlmErrorReason | undefined;
+  readonly need: LlmTaskNeed | undefined;
   constructor(problem: LlmProblem, options: LlmErrorOptions = {}) {
     super(LLM_PROBLEM_MESSAGES[problem], { cause: options.cause });
     this.name = "LlmError";
@@ -68,5 +98,6 @@ export class LlmError extends Error {
     this.usage = options.usage;
     this.task = options.task;
     this.reason = options.reason;
+    this.need = options.need;
   }
 }

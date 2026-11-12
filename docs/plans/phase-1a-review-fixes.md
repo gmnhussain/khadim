@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| Status | Slices 1 and 2 done 2026-11-12. Approved by the owner, 2026-11-12: D-1 to D-10 as their Defaults, with D-10 as changed by this plan and the edge case D-6 changes in `features/agent.md`; the names `RUN_EMPTY_ANSWER`, `TOOL_CALL_DEFERRED` and `TOOL_OUTPUT_TOO_LARGE` and `MAX_TOOL_OUTPUT_CHARS` = 16,000 |
+| Status | Slices 1 to 3 done 2026-11-12. Approved by the owner, 2026-11-12: D-1 to D-10 as their Defaults, with D-10 as changed by this plan and the edge case D-6 changes in `features/agent.md`; the names `RUN_EMPTY_ANSWER`, `TOOL_CALL_DEFERRED` and `TOOL_OUTPUT_TOO_LARGE` and `MAX_TOOL_OUTPUT_CHARS` = 16,000 |
 | Phase | 1a, on branch `feat/agent-loop-core`, before the 1b plan |
 | Sources | `/code-review high` of `chore/apply-foundation-review...feat/agent-loop-core` for `core/src/shared` and `core/src/tools` (#1–#17), `core/src/llm` (L1–L18), `core/src/agent` (A1–A15) and `packages/integrations` (I1–I17), all run without a verify pass; and the owner's own review (R1–R3), each confirmed in the code |
 

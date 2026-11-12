@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LlmCapabilities } from "./llm.types";
-import { findMissingCapability, findRouteProblem } from "./model-routing.rules";
+import { findMissingCapability, findRouteProblem, type RouteCheck } from "./model-routing.rules";
 
 const FULL: LlmCapabilities = {
   supportsTools: true,
@@ -47,38 +47,84 @@ describe("findMissingCapability", () => {
 });
 
 describe("findRouteProblem", () => {
-  it("finds nothing for a known model on an enabled provider that meets the needs", () => {
-    expect(
-      findRouteProblem({ capabilities: FULL, isProviderEnabled: true, needs: ["tools"] }),
-    ).toBeUndefined();
+  const check = (overrides: Partial<RouteCheck> = {}): RouteCheck => ({
+    capabilities: FULL,
+    modelMaxOutputTokens: 64_000,
+    routeMaxOutputTokens: 16_000,
+    isProviderEnabled: true,
+    requirements: { needs: ["tools"], minContextTokens: 100_000 },
+    ...overrides,
   });
 
-  it("reports a route to a model the catalog does not list", () => {
-    expect(
-      findRouteProblem({ capabilities: undefined, isProviderEnabled: true, needs: [] }),
-    ).toEqual({ problem: "LLM_ROUTE_INVALID", refusal: "unknown_model" });
+  it("finds nothing for an enabled provider and a model that meets the task's requirements", () => {
+    expect(findRouteProblem(check())).toBeUndefined();
   });
 
   it("reports a route to a provider the owner did not enable (BR-27)", () => {
-    expect(findRouteProblem({ capabilities: FULL, isProviderEnabled: false, needs: [] })).toEqual({
+    expect(findRouteProblem(check({ isProviderEnabled: false }))).toEqual({
       problem: "LLM_ROUTE_INVALID",
       refusal: "provider_disabled",
     });
   });
 
-  it("reports a task that needs tools routed to a model without tool support (BR-25)", () => {
-    expect(
-      findRouteProblem({
-        capabilities: { ...FULL, supportsTools: false },
-        isProviderEnabled: true,
-        needs: ["tools"],
-      }),
-    ).toEqual({ problem: "LLM_ROUTE_INVALID", refusal: "missing_capability" });
+  it("names the need a model cannot meet (BR-25, L11)", () => {
+    expect(findRouteProblem(check({ capabilities: { ...FULL, supportsTools: false } }))).toEqual({
+      problem: "LLM_ROUTE_INVALID",
+      refusal: "missing_capability",
+      need: "tools",
+    });
   });
 
-  it("reports the unknown model before the disabled provider", () => {
+  it.each([
+    [200_000, undefined],
+    [199_999, "context_too_small"],
+  ])(
+    "with a task that needs 200,000 tokens of context and a model of %i, reports %s (D-3)",
+    (maxContextTokens, refusal) => {
+      const finding = findRouteProblem(
+        check({
+          capabilities: { ...FULL, maxContextTokens },
+          requirements: { needs: [], minContextTokens: 200_000 },
+        }),
+      );
+
+      expect(finding?.refusal).toBe(refusal);
+    },
+  );
+
+  it.each([
+    [64_000, undefined],
+    [64_001, "output_over_model_limit"],
+  ])(
+    "with a model limit of 64,000 output tokens and a route asking %i, reports %s (L5)",
+    (routeMaxOutputTokens, refusal) => {
+      expect(findRouteProblem(check({ routeMaxOutputTokens }))?.refusal).toBe(refusal);
+    },
+  );
+
+  it.each([
+    [8_191, undefined],
+    [8_192, "output_not_below_context"],
+  ])(
+    "with an 8,192-token context and a route asking %i output tokens, reports %s (L5)",
+    (routeMaxOutputTokens, refusal) => {
+      const finding = findRouteProblem(
+        check({
+          capabilities: { ...FULL, maxContextTokens: 8_192 },
+          routeMaxOutputTokens,
+          requirements: { needs: [], minContextTokens: 0 },
+        }),
+      );
+
+      expect(finding?.refusal).toBe(refusal);
+    },
+  );
+
+  it("reports the disabled provider before a missing capability", () => {
     expect(
-      findRouteProblem({ capabilities: undefined, isProviderEnabled: false, needs: ["tools"] }),
-    ).toMatchObject({ refusal: "unknown_model" });
+      findRouteProblem(
+        check({ isProviderEnabled: false, capabilities: { ...FULL, supportsTools: false } }),
+      ),
+    ).toMatchObject({ refusal: "provider_disabled" });
   });
 });

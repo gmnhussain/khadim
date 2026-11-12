@@ -175,6 +175,17 @@ describe("listTools", () => {
   });
 });
 
+describe("listTasks", () => {
+  it("lists every configured task, with or without tools", () => {
+    const { registry } = createFixture({
+      policies: { read_note: { policy: "auto" } },
+      tasks: { [TASK]: ["read_note"], summarise: [] },
+    });
+
+    expect(registry.listTasks()).toEqual([TASK, "summarise"]);
+  });
+});
+
 describe("resolveToolCalls: one call", () => {
   it("resolves a valid call with its tier, policy and validated input, without running it", async () => {
     const { registry, readTool } = createFixture();

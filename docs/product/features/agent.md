@@ -22,7 +22,7 @@ Slice 1a has no tables. The loop reads and writes through an injected run store 
 | Tool call | `ToolCall` | In memory | Tool name, validated input, result or error result, policy applied, timing (BR-23) |
 | Tool | `ToolDefinition` | Code | Name, description, Zod input schema, handler, effect tier |
 | Tool policy | `ToolPolicy` | Validated configuration object | `auto`, `propose` or `approve`, with per-run and per-day call limits, by tool name; each task lists its tools (ADR-0011). Arguments bound by the run arrive with their first tool, in Phase 5 |
-| Model catalog and routes | `modelCatalog`, `ModelRoute` | Validated configuration object | Per model: provider, id, capabilities, context limit, tiered prices. Per task: route, effort, `maxAttempts` (plan D-1, D-9) |
+| Model catalog and routes | `modelCatalog`, `ModelRoute` | Validated configuration object | Per model: provider, id, capabilities, context limit, maximum output per call, tiered prices. Per task: route, effort, `maxAttempts` (phase-1 plan, D-1, D-9), and requirements from the composition root: needs and the smallest context the task can work in (review fixes, D-3) |
 | Message and content parts | `llm.types` | Code | Provider-neutral: text, tool call, tool result, and an opaque reasoning part the adapter returns to the same provider unchanged |
 | Pending action | `PendingAction` | Not built | 1a only signals that a step created one, through an injected dependency; the entity arrives with approvals (Phase 3) |
 
@@ -106,7 +106,7 @@ The closed unions of conventions §12.1. "Documented" codes come from convention
 | `LLM_NOT_AUTHORIZED` | New (owner, 2026-11-12) | The key is invalid, a permission is missing, or credit or billing is exhausted: the owner fixes it | No | Run fails |
 | `LLM_OUTPUT_TRUNCATED` | New (owner, 2026-11-12) | The call stopped at its maximum output. Cut-off text is never an answer and a cut-off tool call never executes | No | Run fails |
 | `LLM_CONTEXT_EXCEEDED` | New (owner, 2026-11-12) | The context is larger than the model's limit | No | Run fails |
-| `LLM_ROUTE_INVALID` | New | The model catalog is malformed, or a route names an unknown model, a provider that is not enabled, or a model without a capability the task needs (BR-25) | — | Configuration is rejected; the app does not start |
+| `LLM_ROUTE_INVALID` | New | The model catalog is malformed, or a route names an unknown model, a provider that is not enabled or has no adapter, a model without a capability the task needs (streaming for every route, tools for a task that has tools), a model whose context is smaller than the task needs, or more output than the model can write or than fits below its context. A task with requirements, or with tools, that has no route is refused too (BR-25; review fixes, D-3, D-4). The error names the task, a reason code and, for a missing capability, the need | — | Configuration is rejected; the app does not start |
 
 **Agent problems** (`AgentProblem`, `agent.errors.ts`)
 
