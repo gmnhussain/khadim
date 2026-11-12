@@ -184,12 +184,15 @@ packages/core/src/
   llm/
     llm.port.ts                 LlmProvider interface + capabilities
     llm.types.ts                provider-neutral messages, content parts, tools, usage, stop reasons
+    llm.errors.ts               LLM problem codes; LlmError with retryAfterMs and the vendor error as cause
+    retry.rules.ts              pure rules: which failed call is retried, and after what delay
     model-registry.ts           model catalog and task routes (from config), startup validation
     model-routing.rules.ts      pure rules: override → schedule → task route → fallbacks; capability checks
     usage.rules.ts              cost calculation in integer micro-USD
     testing/                    FakeLlmProvider
   tools/
     tool.types.ts               ToolDefinition: name, description, Zod input, handler, effect tier
+    tool.errors.ts              tool problem codes; ToolRefusedError
     tool-policy.rules.ts        pure rules: tier floor, policy resolution, limits, bindings
     tool-source.port.ts         ToolSource interface (built-in tools now, MCP servers later)
     tool-registry.ts            registration, schema export, lookup, execution
@@ -218,6 +221,7 @@ packages/core/src/
     notification.service.ts     store (deduplicated), list, mark read, queue external delivery
   shared/
     errors.ts  request-context.ts  outbox.ts  audit.ts  crypto.ts
+    ids.ts  clock.ts            UUIDv7 id generator; injectable clock
     jobs/                       job definitions: queue, name, Zod payload, job-id builder
 ```
 
@@ -405,13 +409,13 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
 - Every error response is `application/problem+json` with `type`, `title`, `status`, `detail`, a stable UPPER_SNAKE `code`, `requestId`, and `errors[]` for field-level problems. Never internals on `5xx`.
 - No try/catch in handlers: services throw typed domain errors; one central handler maps them.
 - Shared errors: `NotFoundError`, `ForbiddenError`, `ValidationError`, `VersionConflictError`, `ConflictError`.
-- Agent-specific codes: `RUN_BUDGET_EXCEEDED`, `RUN_ITERATION_LIMIT`, `LLM_UNAVAILABLE` (503), `LLM_RATE_LIMITED` (429 upstream, retried first), `LLM_REFUSED` (the model refused; the run ends, phase-1 plan D-8), `TOOL_INPUT_INVALID`, `PLATFORM_NOT_CONNECTED`, `PLATFORM_CAPABILITY_UNSUPPORTED`, `APPROVAL_REQUIRED`.
+- Agent-specific codes: `RUN_BUDGET_EXCEEDED`, `RUN_ITERATION_LIMIT`, `LLM_UNAVAILABLE` (503), `LLM_RATE_LIMITED` (429 upstream, retried first), `LLM_REFUSED` (the model refused; the run ends, phase-1 plan D-8), `TOOL_INPUT_INVALID`, `PLATFORM_NOT_CONNECTED`, `PLATFORM_CAPABILITY_UNSUPPORTED`, `APPROVAL_REQUIRED`. The full agent, tool and LLM code lists, with the codes added in Phase 1a (`RUN_TOKEN_LIMIT`, `RUN_TIME_LIMIT`, `LLM_REQUEST_REJECTED`, `LLM_NOT_AUTHORIZED`, `LLM_OUTPUT_TRUNCATED`, `LLM_CONTEXT_EXCEEDED`, `LLM_ROUTE_INVALID`, `TOOL_NOT_FOUND`, `TOOL_LIMIT_REACHED`, `TOOL_EXECUTION_FAILED`, `TOOL_UNCLASSIFIED`, `TOOL_POLICY_INVALID`), are in the [agent feature doc](../product/features/agent.md#problem-codes).
 - Pure rules return a problem code; services turn it into the error.
 
 ### 12.1 Domain errors
 
 - Shared errors live in `core/src/shared/errors.ts`; a module's own errors in `<module>.errors.ts`, as `Error` subclasses with `name` set. They carry problem codes, never HTTP status codes; the API's central handler maps codes to statuses.
-- A module's error carries a problem from a **closed union of its problem codes** (UPPER_SNAKE_CASE, the same `code` the API returns), with a message map (and a field map where a problem belongs to one input field), so a new problem fails to compile until it has a message. The example is illustrative: only `TOOL_INPUT_INVALID` is a documented code, and the agent feature doc (`features/agent.md`, written in 1a) defines the real ones.
+- A module's error carries a problem from a **closed union of its problem codes** (UPPER_SNAKE_CASE, the same `code` the API returns), with a message map (and a field map where a problem belongs to one input field), so a new problem fails to compile until it has a message. The example is illustrative: only `TOOL_INPUT_INVALID` is a documented code, and the [agent feature doc](../product/features/agent.md#problem-codes) defines the real ones.
 
   ```ts
   export type ToolProblem = "TOOL_INPUT_INVALID" | "TOOL_UNCLASSIFIED" | "TOOL_LIMIT_REACHED";

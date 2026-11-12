@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| Status | Draft 2026-11-12. The owner approved the eight new problem codes on 2026-11-12; the open questions at the end are still open. Covers slice 1a (loop, tools and LLM port in core, no database or apps). The 1b plan adds conversations, persistence, streaming to the browser and the API surface |
+| Status | Built in slice 1a, done 2026-11-12. The owner approved the new problem codes and answered every open question on 2026-11-12; the answers are at the end. Covers slice 1a (loop, tools and LLM port in core, no database or apps). The 1b plan adds conversations, persistence, streaming to the browser and the API surface |
 | Design | [Agent design](../../architecture/agent.md); conventions §15; ADR-0005, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0014 |
 | Plan | [Phase 1, slice 1a](../../plans/phase-1-agent-core.md#slice-1a-in-detail) |
 
@@ -163,76 +163,48 @@ All are proved by unit tests with `FakeLlmProvider`, an in-memory run store, a f
 - **Attempts.** Given a route with `maxAttempts` 3 and three retryable failures, then the third failure ends the call with its mapped code (D-9 rule 3).
 - **Cancel during a wait.** Given a cancel during a retry wait, then the wait ends at once and the run ends `cancelled` (D-9 rule 5).
 - **Invalid route.** Given a task that needs tools routed to a model without tool support, when the catalog is validated, then it is rejected with `LLM_ROUTE_INVALID` (BR-25).
-- **Adapter contract.** Given the recorded Anthropic fixtures, when the shared contract suite runs, then messages, tool calls, streaming events, usage and every mapped error code match, `retryAfterMs` comes from the rate-limit response, the SDK's retries are off, and no rejected field is sent (plan P-5).
+- **Adapter contract.** Given Anthropic fixtures hand-built from the provider's documented shapes (recorded fixtures replace them after the deferred recording, plan D-6), when the shared contract suite runs, then messages, tool calls, streaming events, usage and every mapped error code match, `retryAfterMs` comes from the rate-limit response, the SDK's retries are off, and no rejected field is sent (plan P-5).
 
-## Open questions
+## Owner decisions
 
-Each needs the owner's answer before the increment named in brackets. Recommendations are suggestions, not decisions.
+Every open question of slice 1a is answered. The answers below are the owner's, as recorded in the [plan](../../plans/phase-1-agent-core.md#increments); nothing is open.
 
-> **Open question:** BR-21 lists a token limit but gives no number, and D-5 sets none. What is the per-run token limit, or is there none in 1a? [increment 5]
+**Limits and outcomes**
 
-> **Owner answer (2026-11-12):** **Default:** 500,000 tokens per run, counting input and output across all calls, retuned after the first evals. It stops runaway loops on cheap models, where the cost budget alone would allow millions of tokens.
+> **Owner answer (2026-11-12):** **Default:** the per-run token limit is 500,000 tokens, counting input and output across all calls, retuned after the first evals. It stops runaway loops on cheap models, where the cost budget alone would allow millions of tokens.
 
-> **Open question:** Which code ends a run at the token limit: `RUN_BUDGET_EXCEEDED` (shared with cost) or its own code? Agent design §2 names only two codes for four limits. This doc proposes `RUN_TIME_LIMIT` for running time; is that name right? [increment 5]
+> **Owner answer (2026-11-12):** The token limit has its own code, `RUN_TOKEN_LIMIT`; `RUN_BUDGET_EXCEEDED` stays for cost only. `RUN_TIME_LIMIT` is the name for the running-time limit.
 
-> **Owner answer (2026-11-12):** The token limit has its own code, `RUN_TOKEN_LIMIT`; `RUN_BUDGET_EXCEEDED` stays for cost only. `RUN_TIME_LIMIT` is the right name for the running-time limit.
+> **Owner answer (2026-11-12):** When the call that returns the final answer also crosses the cost or token budget, the run succeeds: a budget stops the next call and never discards a finished answer.
 
-> **Open question:** When the call that returns the final answer is also the one that crosses the cost or token budget, does the run succeed (the answer is already paid for) or fail? Recommendation: succeed; a budget stops the next call, never discards a finished answer. [increment 5]
+> **Owner answer (2026-11-12):** Tools the model asks for on the last allowed iteration are not executed; the run fails with `RUN_ITERATION_LIMIT`.
 
-> **Owner answer (2026-11-12):** The run succeeds: a budget stops the next call and never discards a finished answer.
+**Model calls**
 
-> **Open question:** When the model asks for tools on the last allowed iteration, are those tools executed before the run fails with `RUN_ITERATION_LIMIT`? Recommendation: no. [increment 5]
+> **Owner answer (2026-11-12):** A call that stops at its maximum output fails the run with `LLM_OUTPUT_TRUNCATED`, and is not retried. Cut-off text is never returned as an answer, and a cut-off tool call is never executed.
 
-> **Owner answer (2026-11-12):** They are not executed; the run fails with `RUN_ITERATION_LIMIT`.
+> **Owner answer (2026-11-12):** A run's history is append-only in 1a, and a run whose context is over the model's limit fails with `LLM_CONTEXT_EXCEEDED`. It is not retried.
 
-> **Open question:** What happens when a model call stops because it reached its maximum output? Options: fail the run with a new LLM code, or return the cut-off text as the answer. No documented code covers it. [increment 4]
-
-> **Owner answer (2026-11-12):** The run fails with a new code, `LLM_OUTPUT_TRUNCATED`, and the call is not retried. Cut-off text is never returned as an answer, and a cut-off tool call is never executed.
-
-> **Open question:** A run whose context would exceed the model's limit fails (owner, 2026-11-12; a run's history is append-only in 1a). Which code? The provider reports the overflow, as a rejected request or as a stop reason, so core cannot see it before the call. Recommendation: a new LLM code, `LLM_CONTEXT_EXCEEDED`, not retried, mapped by the adapter from both forms. [increment 4]
-
-> **Owner answer (2026-11-12):** `LLM_CONTEXT_EXCEEDED`. It is not retried.
-
-> **Open question:** Conventions §15.2 requires a maximum output and a timeout on every call; D-1 sets neither. What are the values per task? Recommendation: both live on the route in the catalog, and the timeout is also capped by the run's remaining running time. [increment 4]
-
-> **Owner answer (2026-11-12):** Both live on the route in the catalog. **Default:** 16,000 output tokens and a 120-second timeout per call, with the timeout capped by the run's remaining running time. Both are retuned after the first evals.
-
-> **Open question:** D-9 rule 2 counts only text and tool calls as emitted. Current Claude models also stream reasoning blocks, empty by default. Does a stream that fails after only reasoning count as "nothing emitted" and get retried? Recommendation: yes, nothing has reached the owner. [increment 4]
+> **Owner answer (2026-11-12):** The maximum output and the timeout of a call both live on the route in the catalog. **Default:** 16,000 output tokens and a 120-second timeout per call, with the timeout capped by the run's remaining running time. Both are retuned after the first evals.
 
 > **Owner answer (2026-11-12):** A stream that fails after only reasoning content counts as nothing emitted under D-9 rule 2, and is retried.
 
-> **Open question:** Under D-9 rule 1, when the provider's delay exceeds the remaining running time, which code fails the run: `LLM_RATE_LIMITED` (the cause) or `RUN_TIME_LIMIT`? Recommendation: `LLM_RATE_LIMITED`, so the 1c fallback question keys on one code. [increment 4]
+> **Owner answer (2026-11-12):** Under D-9 rule 1, when a provider's retry delay is equal to or longer than the remaining running time, the run fails with `LLM_RATE_LIMITED`, not with `RUN_TIME_LIMIT`.
 
-> **Owner answer (2026-11-12):** The run fails with `LLM_RATE_LIMITED`.
-
-> **Open question:** For the loop, is `propose` the same as `auto` (the handler runs now and stores the proposal in its own module, the run continues, ADR-0011), with the difference living in the tool's module? No `propose` tool exists before Phase 2. [increment 3]
-
-> **Owner answer (2026-11-12):** Yes. For the loop, `propose` is the same as `auto`: the handler runs now and the run continues. The difference lives in the tool's own module (ADR-0011).
-
-> **Open question:** Pending actions arrive in Phase 3. May 1a model the `approve` path with an injected "request pending action" dependency and a fake tool in `tools/testing`, so the pause is proved now? [increment 5]
-
-> **Owner answer (2026-11-12):** Yes: 1a proves the approve pause with an injected "request pending action" dependency and a fake approve tool. The real implementation comes with approvals in Phase 3; no production placeholder is added.
-
-> **Open question:** Per-day tool limits need call counts from earlier runs, which 1a does not store. Is the per-day limit a pure rule in 1a, fed a count by the caller, with real counts in 1b; or deferred entirely? [increment 3]
-
-> **Owner answer (2026-11-12):** A pure rule in 1a, fed the day's call count by an injected source. Tests use an in-memory count; real counts come from the database in 1b.
-
-> **Open question:** `get_current_time`: what input and output? Recommendation: optional `timeZone` (IANA name, default the configured zone, conventions §7), returning the UTC timestamp, the zone and the local date and time. [increment 3]
-
-> **Owner answer (2026-11-12):** An optional IANA `timeZone`, defaulting to the configured zone (Asia/Dhaka). It returns the UTC timestamp, the zone, and the local date and time. An unknown zone is `TOOL_INPUT_INVALID`.
-
-> **Open question:** A task lists a built-in tool that has no policy entry. Is that a startup failure, or is the tool silently left out (ADR-0014 only says it is never offered)? [increment 3]
-
-> **Owner answer (2026-11-12):** A task that lists a tool with no policy entry stops the app at startup (fail closed, conventions §15.4), with `TOOL_UNCLASSIFIED`. A tool is never silently left out.
-
-> **Open question:** Is one code, `LLM_REQUEST_REJECTED`, enough for every non-retryable provider error, or should credential and billing failures (the owner can fix them) have their own code, separate from invalid requests (a bug)? [increment 4]
-
-> **Owner answer (2026-11-12):** Two codes. `LLM_REQUEST_REJECTED` is an invalid request, a bug in Khadim. A new `LLM_NOT_AUTHORIZED` is an invalid key, a missing permission, or exhausted credit or billing, which the owner fixes. Neither is retried.
-
-> **Open question:** Prices are integer micro-USD per million tokens, so one call's cost can be a fraction of a micro-USD. Round up, down or to nearest, per call? Recommendation: up, so a budget never undercounts. [increment 4]
+> **Owner answer (2026-11-12):** Non-retryable provider errors have two codes. `LLM_REQUEST_REJECTED` is an invalid request, a bug in Khadim. `LLM_NOT_AUTHORIZED` is an invalid key, a missing permission, or exhausted credit or billing, which the owner fixes. Neither is retried.
 
 > **Owner answer (2026-11-12):** Cost is rounded up to a whole micro-USD per call; run totals are the sum of the rounded calls.
 
-> **Open question:** Conventions §12 lists `APPROVAL_REQUIRED` with no meaning. 1a does not use it (a pause is an outcome, not an error). Does it belong to the approvals feature doc in Phase 3? [no increment blocked]
+**Tools and approvals**
 
-> **Owner answer (2026-11-12):** Not used in 1a, because a pause is an outcome, not an error. `APPROVAL_REQUIRED` is defined by the approvals feature doc in Phase 3.
+> **Owner answer (2026-11-12):** For the loop, `propose` is the same as `auto`: the handler runs now and the run continues. The difference lives in the tool's own module (ADR-0011).
+
+> **Owner answer (2026-11-12):** 1a proves the approve pause with an injected "request pending action" dependency and a fake approve tool. The real implementation comes with approvals in Phase 3; no production placeholder is added.
+
+> **Owner answer (2026-11-12):** The per-day tool limit is a pure rule in 1a, fed the day's call count by an injected source. Tests use an in-memory count; real counts come from the database in 1b.
+
+> **Owner answer (2026-11-12):** `get_current_time` takes an optional IANA `timeZone`, defaulting to the configured zone (Asia/Dhaka). It returns the UTC timestamp, the zone, and the local date and time. An unknown zone is `TOOL_INPUT_INVALID`.
+
+> **Owner answer (2026-11-12):** A task that lists a tool with no policy entry stops the app at startup (fail closed, conventions §15.4), with `TOOL_UNCLASSIFIED`. A tool is never silently left out.
+
+> **Owner answer (2026-11-12):** `APPROVAL_REQUIRED` is not used in 1a, because a pause is an outcome, not an error. It is defined by the approvals feature doc in Phase 3.

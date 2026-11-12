@@ -64,4 +64,4 @@ The history shows only the owner's identity (conventions §3.1). This overrides 
 
 ## Current phase
 
-Phase 0 (docs foundation and scaffold) is done. Current: Phase 1a, the agent loop in core, per the approved [Phase 1 plan](docs/plans/phase-1-agent-core.md). See [roadmap](docs/product/prd.md#5-scope-by-phase).
+Phase 0 (docs foundation and scaffold) is done. Phase 1a, the agent loop in core, is done (2026-11-12), per the approved [Phase 1 plan](docs/plans/phase-1-agent-core.md). Next: the 1b plan (chat end to end), written and approved before any 1b code. See [roadmap](docs/product/prd.md#5-scope-by-phase).

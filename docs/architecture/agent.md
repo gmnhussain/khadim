@@ -67,9 +67,9 @@ sequenceDiagram
 
 Events (`text.delta`, `tool.called`, `approval.required`, …) go to the run's Redis Stream as they happen; the API relays them over SSE (ADR-0010).
 
-- **Limits** (BR-21): `MAX_AGENT_ITERATIONS`, per-run token and cost budgets, a wall-clock timeout. Each limit ends the run with its problem code (`RUN_ITERATION_LIMIT`, `RUN_BUDGET_EXCEEDED`).
+- **Limits** (BR-21): `MAX_AGENT_ITERATIONS`, per-run token and cost budgets, a wall-clock timeout. Each limit ends the run with its problem code (`RUN_ITERATION_LIMIT`, `RUN_BUDGET_EXCEEDED`, `RUN_TOKEN_LIMIT`, `RUN_TIME_LIMIT`; [agent feature doc](../product/features/agent.md#problem-codes)).
 - **Parallelism:** independent `read` tools may run in parallel; `local_write` and `external` tools run one at a time.
-- **Errors:** invalid tool input or a failing tool returns an error result to the model so it can correct itself. Provider rate limits and overloads retry with backoff; other provider errors fail the run.
+- **Errors:** invalid tool input or a failing tool returns an error result to the model so it can correct itself. Provider rate limits and outages are retried by the loop under the retry rules of [§7](#retries); other provider errors fail the run.
 - **Cancellation** is checked between steps.
 
 ## 3. Context building
@@ -207,9 +207,11 @@ flowchart LR
   resolve -->|2| sched[Schedule override]
   resolve -->|3| task[Task route]
   msg & sched & task --> check[Check capabilities<br/>and provider enabled]
-  check --> adapter[Adapter: anthropic, openai-compatible,<br/>openai, gemini]
-  adapter -->|unavailable after retries| fb[Next fallback route]
-  fb --> adapter
+  check --> retry[Retry policy in core<br/>retry.rules, applied by the loop]
+  retry -->|one call per attempt| adapter[Adapter: anthropic, openai-compatible,<br/>openai, gemini<br/>maps errors, never retries]
+  adapter -->|mapped error| retry
+  retry -->|retries exhausted on<br/>rate limit or outage| fb[Next fallback route]
+  fb --> retry
 ```
 
 | Task | Default model class | Why |
@@ -221,9 +223,20 @@ flowchart LR
 > **Default:** Every task routes to Anthropic until other adapters exist. Exact model ids, prices and limits live in the model catalog configuration read by `model-registry.ts`, never in services.
 
 - Capabilities gate routing: a task that needs tools never routes to a model without tool support (BR-25).
-- Fallbacks run only after retries are exhausted on provider outage or rate limiting, and are recorded on the run (BR-26).
+- Fallbacks run only after [retries](#retries) are exhausted on provider outage or rate limiting, and are recorded on the run (BR-26). They arrive in slice 1c.
 - History is stored provider-neutral, so a conversation can switch model between messages.
 - Only enabled providers receive owner data (BR-27).
+
+### Retries
+
+A model call is retried by Khadim or by the provider's SDK, never both. Khadim retries, in core (phase-1 plan, D-9): each attempt is counted once and can be recorded on the run. An adapter turns its SDK's own retries off, makes one HTTP call per attempt and only maps errors.
+
+- **What is retried:** only `LLM_RATE_LIMITED` and `LLM_UNAVAILABLE`. Every other problem ends the call at once.
+- **Mid-stream:** a call is retried only when it has emitted nothing. Only text and tool calls count as emitted; provider metadata (stream start, pings, usage) and reasoning do not. A stream that fails after text or a tool call was emitted fails the step with the mapped problem.
+- **Attempts:** each route in the model catalog has `maxAttempts`, counting the first try. **Default:** 3. When the attempts run out, the mapped problem ends the call.
+- **Delay:** exponential backoff with jitter, or the provider's retry delay, whichever is longer. The adapter reads that delay into `retryAfterMs` from the `retry-after-ms` header (milliseconds), or from `retry-after` (seconds). The jitter's random value is injected, so the rule stays pure.
+- **Running time:** a call is retried only when the delay is strictly shorter than the run's remaining running time (BR-21). When the delay is equal to or longer than the remaining running time, the run fails without waiting, with the problem the call returned.
+- **Cancellation:** a cancel during a retry wait ends the wait at once, and the run ends as cancelled.
 
 ## 8. Prompts
 

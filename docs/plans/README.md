@@ -6,7 +6,7 @@
 | --- | --- |
 | [phase-0-foundation.md](phase-0-foundation.md) | Done |
 | [foundation-review.md](foundation-review.md) | Done 2026-11-12 |
-| [phase-1-agent-core.md](phase-1-agent-core.md) | Re-approved 2026-11-12; slice 1a next |
+| [phase-1-agent-core.md](phase-1-agent-core.md) | Re-approved 2026-11-12; slice 1a done 2026-11-12; the 1b plan is next |
 
 ## Template
 
