@@ -19,8 +19,13 @@ export interface RunContext {
 const UNTRUSTED_TAG = "untrusted_content";
 /** Where untrusted text came from, such as `comment` or `web_page`. */
 const SOURCE_PATTERN = /^[a-z][a-z0-9_]*$/;
-/** The tag itself inside untrusted text, opening or closing, in any letter case. */
-const EMBEDDED_TAG_PATTERN = /<(\/?)untrusted_content/gi;
+/**
+ * The tag's name inside untrusted text, in any spelling a model might still read as the tag: any
+ * letter case, and spaces, `_` or `-` (or none) between the words. Matching the name, not the
+ * brackets, also catches `</ untrusted_content>` and `&lt;/untrusted_content&gt;` (finding A9).
+ */
+const EMBEDDED_TAG_NAME_PATTERN = /untrusted[\s_-]*content/gi;
+const DEFUSED_TAG_NAME = "untrusted-content-escaped";
 
 /**
  * Wraps text from outside Khadim in a labelled block the system prompt declares to be data
@@ -31,7 +36,7 @@ export function wrapUntrustedContent(source: string, text: string): string {
   if (!SOURCE_PATTERN.test(source)) {
     throw new Error(`untrusted content source is not a snake_case label: ${source}`);
   }
-  const defused = text.replace(EMBEDDED_TAG_PATTERN, "<$1untrusted-content-escaped");
+  const defused = text.replace(EMBEDDED_TAG_NAME_PATTERN, DEFUSED_TAG_NAME);
   return `<${UNTRUSTED_TAG} source="${source}">\n${defused}\n</${UNTRUSTED_TAG}>`;
 }
 

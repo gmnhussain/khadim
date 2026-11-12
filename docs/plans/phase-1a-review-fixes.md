@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| Status | Slices 1 to 4 done 2026-11-12. Approved by the owner, 2026-11-12: D-1 to D-10 as their Defaults, with D-10 as changed by this plan and the edge case D-6 changes in `features/agent.md`; the names `RUN_EMPTY_ANSWER`, `TOOL_CALL_DEFERRED` and `TOOL_OUTPUT_TOO_LARGE` and `MAX_TOOL_OUTPUT_CHARS` = 16,000 |
+| Status | Slices 1 to 5 done 2026-11-12. Approved by the owner, 2026-11-12: D-1 to D-10 as their Defaults, with D-10 as changed by this plan and the edge case D-6 changes in `features/agent.md`; the names `RUN_EMPTY_ANSWER`, `TOOL_CALL_DEFERRED` and `TOOL_OUTPUT_TOO_LARGE` and `MAX_TOOL_OUTPUT_CHARS` = 16,000 |
 | Phase | 1a, on branch `feat/agent-loop-core`, before the 1b plan |
 | Sources | `/code-review high` of `chore/apply-foundation-review...feat/agent-loop-core` for `core/src/shared` and `core/src/tools` (#1–#17), `core/src/llm` (L1–L18), `core/src/agent` (A1–A15) and `packages/integrations` (I1–I17), all run without a verify pass; and the owner's own review (R1–R3), each confirmed in the code |
 
@@ -117,7 +117,7 @@ Docs in this slice: KP-20 lists both matched messages and the 413.
 | Fix | Findings | Change | Test that fails before and passes after |
 | --- | --- | --- | --- |
 | 6.1 Local helpers are `const` arrows | **#16**, L14 | Every module-level helper that is not exported, in every 1a module and in integrations, becomes a `const` arrow (conventions §7). Functions inside a factory stay as they are. There is no lint rule: ESLint's `func-style` cannot tell the two apart. | No new test (refactor) |
-| 6.2 Named constants | **#17** | The `DataView` offsets in `ids.ts` and the `"en-US"` locale in `get-current-time.tools.ts` become named constants. | No new test (refactor) |
+| 6.2 Named constants | **#17** | The `DataView` offsets in `ids.ts` and the `"en-US"` locale in `get-current-time.tools.ts` become named constants. The `ids.ts` offsets were named in fix 5.1, which rewrote that file, so only the locale is left. | No new test (refactor) |
 | 6.3 One prompt-token sum | **A13** | `countCallTokens` uses `countPromptTokens(usage) + usage.outputTokens`. | No new test: `agent.rules.test.ts` already pins the sum |
 | 6.4 One recording loop for tool calls | **A14** | `handleToolCalls` picks parallel or in-order execution, then records in one loop. | No new test (refactor); the parallel and in-order loop tests keep passing |
 | 6.5 No duplicate tool maps | **#14** | The classified-by-task maps are built in one pass from `toolByName`, which the config rule also uses; the unreachable "lost a tool" throw goes. | No new test (refactor) |

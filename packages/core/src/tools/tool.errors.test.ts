@@ -23,6 +23,10 @@ describe("ToolRefusedError", () => {
     expect(error.cause).toBeUndefined();
   });
 
+  it("has no cause property when none was given (L13, KP-07)", () => {
+    expect("cause" in new ToolRefusedError("TOOL_UNCLASSIFIED")).toBe(false);
+  });
+
   it("names the tool and keeps the cause for logs", () => {
     const cause = new Error("schema issue");
     const error = new ToolRefusedError("TOOL_POLICY_INVALID", {

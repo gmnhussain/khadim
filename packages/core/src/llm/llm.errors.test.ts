@@ -3,6 +3,18 @@ import { describe, expect, it } from "vitest";
 import { LLM_PROBLEM_MESSAGES, LLM_PROBLEMS, LlmError, STOP_REASON_PROBLEMS } from "./llm.errors";
 import { LLM_STOP_REASONS } from "./llm.types";
 
+describe("LlmError: cause (L13)", () => {
+  it("has no cause property when none was given (KP-07)", () => {
+    expect("cause" in new LlmError("LLM_UNAVAILABLE")).toBe(false);
+  });
+
+  it("keeps the vendor error it was given as its cause", () => {
+    const cause = new Error("vendor");
+
+    expect(new LlmError("LLM_UNAVAILABLE", { cause }).cause).toBe(cause);
+  });
+});
+
 describe("LLM problems", () => {
   it("has a message for every problem code (conventions §12.1)", () => {
     expect(Object.keys(LLM_PROBLEM_MESSAGES)).toEqual([...LLM_PROBLEMS]);

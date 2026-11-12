@@ -4,6 +4,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  ProblemError,
   SHARED_PROBLEMS,
   ValidationError,
   VersionConflictError,
@@ -45,6 +46,33 @@ describe("shared errors", () => {
       expect(error).not.toHaveProperty("status");
       expect(error).not.toHaveProperty("statusCode");
     }
+  });
+});
+
+describe("ProblemError", () => {
+  it("keeps the cause it was given, for logs (#15)", () => {
+    const cause = new Error("duplicate key value violates unique constraint");
+
+    const error = new ConflictError({ cause });
+
+    expect(error.cause).toBe(cause);
+    expect(error).toBeInstanceOf(ProblemError);
+  });
+
+  it.each(CASES)(
+    "$name without a cause has no cause property at all (L13, KP-07)",
+    ({ create }) => {
+      expect("cause" in create()).toBe(false);
+    },
+  );
+
+  it("keeps a cause on a ValidationError beside its fields", () => {
+    const cause = new Error("schema issue");
+
+    const error = new ValidationError([{ field: "text", reason: "too_long" }], { cause });
+
+    expect(error.cause).toBe(cause);
+    expect(error.fields).toHaveLength(1);
   });
 });
 

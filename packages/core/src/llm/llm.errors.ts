@@ -1,3 +1,5 @@
+import { ProblemError } from "../shared";
+
 import type { LlmStopReason, LlmTaskNeed, LlmUsage } from "./llm.types";
 
 /** Every problem the llm module can report (features/agent.md, "Problem codes"). */
@@ -83,17 +85,15 @@ export interface LlmErrorOptions {
 }
 
 /** A failed model call, or an invalid model catalog or route (ADR-0009). */
-export class LlmError extends Error {
-  readonly problem: LlmProblem;
+export class LlmError extends ProblemError<LlmProblem> {
   readonly retryAfterMs: number | undefined;
   readonly usage: LlmUsage | undefined;
   readonly task: string | undefined;
   readonly reason: LlmErrorReason | undefined;
   readonly need: LlmTaskNeed | undefined;
   constructor(problem: LlmProblem, options: LlmErrorOptions = {}) {
-    super(LLM_PROBLEM_MESSAGES[problem], { cause: options.cause });
+    super(problem, LLM_PROBLEM_MESSAGES[problem], options);
     this.name = "LlmError";
-    this.problem = problem;
     this.retryAfterMs = options.retryAfterMs;
     this.usage = options.usage;
     this.task = options.task;

@@ -4,6 +4,8 @@ export {
   type FieldProblem,
   ForbiddenError,
   NotFoundError,
+  ProblemError,
+  type ProblemErrorOptions,
   SHARED_PROBLEMS,
   type SharedProblem,
   ValidationError,

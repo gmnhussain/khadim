@@ -129,6 +129,68 @@ describe("createIdGenerator", () => {
     expect(earlier < later).toBe(true);
   });
 
+  it("keeps ids made in the same millisecond in creation order (RFC 9562 §6.2, D-2)", () => {
+    const generator = createIdGenerator({ clock: clockAt(0), randomBytes: fixedBytes(...zeros()) });
+
+    expect([generator.randomId(), generator.randomId(), generator.randomId()]).toEqual([
+      "00000000-0000-7000-8000-000000000000",
+      "00000000-0000-7000-8000-000000000001",
+      "00000000-0000-7000-8000-000000000002",
+    ]);
+  });
+
+  it("adds a random step of 1 to 2^32 within a millisecond, from the low 32 random bits", () => {
+    const generator = createIdGenerator({
+      clock: clockAt(0),
+      randomBytes: fixedBytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0x09),
+    });
+
+    generator.randomId();
+
+    expect(generator.randomId()).toBe("00000000-0000-7000-8000-000000000013");
+  });
+
+  it("keeps the order when the clock goes back: the last timestamp is kept", () => {
+    let nowMs = 1000;
+    const generator = createIdGenerator({
+      clock: { now: () => new Date(nowMs) },
+      randomBytes: fixedBytes(...zeros()),
+    });
+
+    const first = generator.randomId();
+    nowMs = 999;
+    const second = generator.randomId();
+
+    expect(second > first).toBe(true);
+    expect(second.slice(0, 13)).toBe(first.slice(0, 13));
+  });
+
+  it("moves the timestamp forward 1 ms when the random bits would overflow", () => {
+    const generator = createIdGenerator({ clock: clockAt(0), randomBytes: fixedBytes(...ones()) });
+
+    expect(generator.randomId()).toBe("00000000-0000-7fff-bfff-ffffffffffff");
+    expect(generator.randomId()).toBe("00000000-0001-7fff-bfff-ffffffffffff");
+  });
+
+  it("refuses to move past the end of the 48-bit range on an overflow", () => {
+    const generator = createIdGenerator({
+      clock: clockAt(MAX_TIMESTAMP_MS),
+      randomBytes: fixedBytes(...ones()),
+    });
+
+    generator.randomId();
+
+    expect(() => generator.randomId()).toThrow("outside the UUIDv7 timestamp range");
+  });
+
+  it("sorts a thousand ids made in one millisecond in the order they were made", () => {
+    const generator = createIdGenerator({ clock: createFixedClock("2026-11-12T00:00:00.000Z") });
+
+    const ids = Array.from({ length: 1000 }, () => generator.randomId());
+
+    expect([...ids].sort()).toEqual(ids);
+  });
+
   it("uses the system random source by default: well-formed and unique ids", () => {
     const generator = createIdGenerator({ clock: createFixedClock("2026-11-12T00:00:00.000Z") });
     const count = 1000;

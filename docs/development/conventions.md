@@ -414,7 +414,7 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
 
 ### 12.1 Domain errors
 
-- Shared errors live in `core/src/shared/errors.ts`; a module's own errors in `<module>.errors.ts`, as `Error` subclasses with `name` set. They carry problem codes, never HTTP status codes; the API's central handler maps codes to statuses.
+- Shared errors live in `core/src/shared/errors.ts`; a module's own errors in `<module>.errors.ts`, as subclasses of `ProblemError` (`core/src/shared/errors.ts`) with `name` set. `ProblemError` carries the problem code and takes an optional `cause`, set only when given (KP-07). They carry problem codes, never HTTP status codes; the API's central handler maps codes to statuses.
 - A module's error carries a problem from a **closed union of its problem codes** (UPPER_SNAKE_CASE, the same `code` the API returns), with a message map (and a field map where a problem belongs to one input field), so a new problem fails to compile until it has a message. The example is illustrative: only `TOOL_INPUT_INVALID` is a documented code, and the [agent feature doc](../product/features/agent.md#problem-codes) defines the real ones.
 
   ```ts
@@ -427,12 +427,10 @@ Role suffixes: `.service.ts`, `.repository.ts`, `.rules.ts`, `.types.ts`, `.erro
   };
 
   /** A tool call refused by the registry or its policy (ADR-0011, ADR-0014). */
-  export class ToolRefusedError extends Error {
-    readonly problem: ToolProblem;
-    constructor(problem: ToolProblem) {
-      super(TOOL_PROBLEM_MESSAGES[problem]);
+  export class ToolRefusedError extends ProblemError<ToolProblem> {
+    constructor(problem: ToolProblem, options: ProblemErrorOptions = {}) {
+      super(problem, TOOL_PROBLEM_MESSAGES[problem], options);
       this.name = "ToolRefusedError";
-      this.problem = problem;
     }
   }
   ```

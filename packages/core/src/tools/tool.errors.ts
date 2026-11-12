@@ -1,3 +1,5 @@
+import { ProblemError } from "../shared";
+
 /** Every problem the tools module can report (features/agent.md, "Problem codes"). */
 export const TOOL_PROBLEMS = [
   "TOOL_INPUT_INVALID",
@@ -49,13 +51,11 @@ export interface ToolRefusedErrorOptions {
 }
 
 /** Tool configuration refused by the registry (ADR-0011, ADR-0014). */
-export class ToolRefusedError extends Error {
-  readonly problem: ToolConfigProblem;
+export class ToolRefusedError extends ProblemError<ToolConfigProblem> {
   readonly toolName: string | undefined;
   constructor(problem: ToolConfigProblem, options: ToolRefusedErrorOptions = {}) {
-    super(TOOL_PROBLEM_MESSAGES[problem], { cause: options.cause });
+    super(problem, TOOL_PROBLEM_MESSAGES[problem], options);
     this.name = "ToolRefusedError";
-    this.problem = problem;
     this.toolName = options.toolName;
   }
 }
