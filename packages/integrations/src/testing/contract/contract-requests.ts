@@ -7,7 +7,7 @@ import type {
 
 /**
  * The provider-neutral requests of the adapter contract suite. They are the requests the
- * recording script sends (plan D-6) and must stay identical to it, so that a recorded request
+ * recording script sends (phase-1 plan, D-6) and must stay identical to it, so that a recorded request
  * body equals what a contract case sends. Every prompt is synthetic.
  */
 

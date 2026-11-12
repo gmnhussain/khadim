@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { createAnthropicProvider } from "../../llm/anthropic/anthropic.adapter";
 
 /**
- * Records the Anthropic fixtures of the adapter contract suite (plan D-6). The owner runs it by
+ * Records the Anthropic fixtures of the adapter contract suite (phase-1 plan, D-6). The owner runs it by
  * hand with a low-limit test key: `pnpm --filter @khadim/integrations record:anthropic`.
  * It calls the real API through the real adapter, so each fixture holds exactly the request the
  * adapter sends and the raw response it must map. Every prompt is synthetic.
@@ -175,7 +175,7 @@ async function streamToResponse(llmRequest: LlmRequest): Promise<LlmResponse> {
   return completed;
 }
 
-describe("record Anthropic fixtures (owner only, plan D-6)", () => {
+describe("record Anthropic fixtures (owner only, phase-1 plan, D-6)", () => {
   let toolCallTurn: { readonly messages: readonly LlmMessage[]; readonly response: LlmResponse };
 
   it("text-generate", async () => {

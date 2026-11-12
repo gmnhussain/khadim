@@ -6,15 +6,18 @@ export { defineTool, type ToolSpecification } from "./tool-definition";
 export { pausesRun } from "./tool-policy.rules";
 export {
   createToolRegistry,
+  MAX_TOOL_OUTPUT_CHARS,
+  type RequestedToolCall,
   type ResolvedToolCall,
   type ToolCallExecution,
   type ToolCallRefusal,
-  type ToolCallRequest,
   type ToolCallResolution,
+  type ToolCallsRequest,
   type ToolRegistry,
   type ToolRegistryDependencies,
 } from "./tool-registry";
 export {
+  TOOL_PROBLEM_MESSAGES,
   TOOL_PROBLEMS,
   type ToolCallProblem,
   type ToolConfigProblem,

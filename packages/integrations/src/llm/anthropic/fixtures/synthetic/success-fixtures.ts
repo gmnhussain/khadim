@@ -23,7 +23,7 @@ import {
 } from "./synthetic-fixture";
 
 /**
- * Hand-built stand-ins for the eight exchanges the recording script records (plan D-6), under
+ * Hand-built stand-ins for the eight exchanges the recording script records (phase-1 plan, D-6), under
  * the same names. They follow Anthropic's documentation for the pinned SDK and prove only our
  * reading of it, not the live API; the recordings replace them (pitfall KP-20).
  */

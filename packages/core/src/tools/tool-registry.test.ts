@@ -3,7 +3,7 @@ import * as z from "zod";
 
 import { defineTool } from "./tool-definition";
 import { ToolRefusedError } from "./tool.errors";
-import { createToolRegistry } from "./tool-registry";
+import { createToolRegistry, MAX_TOOL_OUTPUT_CHARS } from "./tool-registry";
 import {
   createFakeTool,
   createInMemoryToolCallCounter,
@@ -37,8 +37,25 @@ function createFixture(policyConfig?: unknown) {
   return { registry, readTool, writeTool, proposeTool, externalTool, counter };
 }
 
-function request(toolName: string, input: unknown = { text: "hello" }, callsThisRun = 0) {
-  return { task: TASK, toolName, input, callsThisRun };
+type Registry = ReturnType<typeof createFixture>["registry"];
+
+/** Resolves one call as a step of its own, with `callsThisRun` earlier calls of the tool. */
+async function resolveOne(
+  registry: Registry,
+  toolName: string,
+  input: unknown = { text: "hello" },
+  callsThisRun = 0,
+  task = TASK,
+) {
+  const [resolution] = await registry.resolveToolCalls({
+    task,
+    calls: [{ toolName, input }],
+    callsThisRunByToolName: new Map([[toolName, callsThisRun]]),
+  });
+  if (resolution === undefined) {
+    throw new Error("expected one resolution");
+  }
+  return resolution;
 }
 
 function captureError(action: () => unknown): unknown {
@@ -158,11 +175,11 @@ describe("listTools", () => {
   });
 });
 
-describe("resolveToolCall", () => {
+describe("resolveToolCalls: one call", () => {
   it("resolves a valid call with its tier, policy and validated input, without running it", async () => {
     const { registry, readTool } = createFixture();
 
-    const resolution = await registry.resolveToolCall(request("read_note"));
+    const resolution = await resolveOne(registry, "read_note");
 
     expect(resolution).toEqual({
       ok: true,
@@ -180,8 +197,8 @@ describe("resolveToolCall", () => {
   it("marks only an approve call as pausing the run; propose continues (ADR-0011)", async () => {
     const { registry } = createFixture();
 
-    const proposed = await registry.resolveToolCall(request("suggest_note"));
-    const approved = await registry.resolveToolCall(request("publish_note"));
+    const proposed = await resolveOne(registry, "suggest_note");
+    const approved = await resolveOne(registry, "publish_note");
 
     expect(proposed).toMatchObject({ ok: true, value: { policy: "propose", pausesRun: false } });
     expect(approved).toMatchObject({ ok: true, value: { policy: "approve", pausesRun: true } });
@@ -192,7 +209,7 @@ describe("resolveToolCall", () => {
     async (toolName) => {
       const { registry } = createFixture();
 
-      expect(await registry.resolveToolCall(request(toolName))).toEqual({
+      expect(await resolveOne(registry, toolName)).toEqual({
         ok: false,
         problem: "TOOL_NOT_FOUND",
         message: "This tool is not available in this run.",
@@ -203,12 +220,7 @@ describe("resolveToolCall", () => {
   it("returns TOOL_NOT_FOUND for a tool another task has but this one does not", async () => {
     const { registry } = createFixture();
 
-    const resolution = await registry.resolveToolCall({
-      task: "draft_post",
-      toolName: "read_note",
-      input: { text: "hello" },
-      callsThisRun: 0,
-    });
+    const resolution = await resolveOne(registry, "read_note", { text: "hello" }, 0, "draft_post");
 
     expect(resolution).toMatchObject({ ok: false, problem: "TOOL_NOT_FOUND" });
   });
@@ -216,7 +228,7 @@ describe("resolveToolCall", () => {
   it("returns TOOL_NOT_FOUND for an unconfigured task", async () => {
     const { registry } = createFixture();
 
-    const resolution = await registry.resolveToolCall({ ...request("read_note"), task: "other" });
+    const resolution = await resolveOne(registry, "read_note", { text: "hello" }, 0, "other");
 
     expect(resolution).toMatchObject({ ok: false, problem: "TOOL_NOT_FOUND" });
   });
@@ -225,7 +237,7 @@ describe("resolveToolCall", () => {
     const { registry, readTool } = createFixture();
     const tooLong = "x".repeat(FAKE_TOOL_MAX_TEXT_LENGTH + 1);
 
-    const resolution = await registry.resolveToolCall(request("read_note", { text: tooLong }));
+    const resolution = await resolveOne(registry, "read_note", { text: tooLong });
 
     expect(resolution).toMatchObject({ ok: false, problem: "TOOL_INPUT_INVALID" });
     expect(resolution).toHaveProperty(
@@ -239,7 +251,7 @@ describe("resolveToolCall", () => {
     const { registry } = createFixture();
     const longest = "x".repeat(FAKE_TOOL_MAX_TEXT_LENGTH);
 
-    const resolution = await registry.resolveToolCall(request("read_note", { text: longest }));
+    const resolution = await resolveOne(registry, "read_note", { text: longest });
 
     expect(resolution.ok).toBe(true);
   });
@@ -247,9 +259,10 @@ describe("resolveToolCall", () => {
   it("names the unknown key in the message", async () => {
     const { registry } = createFixture();
 
-    const resolution = await registry.resolveToolCall(
-      request("read_note", { text: "hello", platform: "linkedin" }),
-    );
+    const resolution = await resolveOne(registry, "read_note", {
+      text: "hello",
+      platform: "linkedin",
+    });
 
     expect(resolution).toMatchObject({ ok: false, problem: "TOOL_INPUT_INVALID" });
     expect(resolution).toHaveProperty("message", expect.stringContaining("platform"));
@@ -280,7 +293,7 @@ describe("resolveToolCall", () => {
       countCallsToday: createInMemoryToolCallCounter().countCallsToday,
     });
 
-    const resolution = await registry.resolveToolCall(request("save_form", {}));
+    const resolution = await resolveOne(registry, "save_form", {});
     if (resolution.ok) {
       throw new Error("expected a refusal");
     }
@@ -299,9 +312,7 @@ describe("resolveToolCall", () => {
   ])("with a per-run limit of 3 and %i earlier calls, accepts: %s", async (callsThisRun, ok) => {
     const { registry } = createFixture();
 
-    const resolution = await registry.resolveToolCall(
-      request("read_note", { text: "hello" }, callsThisRun),
-    );
+    const resolution = await resolveOne(registry, "read_note", { text: "hello" }, callsThisRun);
 
     expect(resolution.ok).toBe(ok);
     if (!resolution.ok) {
@@ -322,7 +333,7 @@ describe("resolveToolCall", () => {
     const { registry, counter, readTool } = createFixture();
     counter.setCallsToday("read_note", callsToday);
 
-    const resolution = await registry.resolveToolCall(request("read_note"));
+    const resolution = await resolveOne(registry, "read_note");
 
     expect(resolution.ok).toBe(ok);
     if (!resolution.ok) {
@@ -334,8 +345,8 @@ describe("resolveToolCall", () => {
   it("asks for today's count only for a tool with a per-day limit", async () => {
     const { registry, counter } = createFixture();
 
-    await registry.resolveToolCall(request("save_note"));
-    await registry.resolveToolCall(request("read_note"));
+    await resolveOne(registry, "save_note");
+    await resolveOne(registry, "read_note");
 
     expect(counter.requestedToolNames).toEqual(["read_note"]);
   });
@@ -344,17 +355,111 @@ describe("resolveToolCall", () => {
     const { registry, counter } = createFixture();
     counter.setCallsToday("read_note", 99);
 
-    const invalid = await registry.resolveToolCall(request("read_note", {}, 99));
-    await registry.resolveToolCall(request("delete_note", {}, 99));
+    const invalid = await resolveOne(registry, "read_note", {}, 99);
+    await resolveOne(registry, "delete_note", {}, 99);
 
     expect(invalid).toMatchObject({ ok: false, problem: "TOOL_INPUT_INVALID" });
     expect(counter.requestedToolNames).toEqual([]);
   });
 });
 
+describe("resolveToolCalls: a step of calls", () => {
+  function steps(...texts: string[]) {
+    return texts.map((text) => ({ toolName: "read_note", input: { text } }));
+  }
+
+  it("accepts only the first of three calls against maxCallsPerDay 1 (review fixes, D-1)", async () => {
+    const { registry } = createFixture({
+      policies: { read_note: { policy: "auto", maxCallsPerDay: 1 } },
+      tasks: { [TASK]: ["read_note"] },
+    });
+
+    const resolutions = await registry.resolveToolCalls({
+      task: TASK,
+      calls: steps("a", "b", "c"),
+      callsThisRunByToolName: new Map(),
+    });
+
+    expect(resolutions.map((resolution) => resolution.ok)).toEqual([true, false, false]);
+    expect(resolutions[1]).toMatchObject({ ok: false, problem: "TOOL_LIMIT_REACHED" });
+  });
+
+  it("adds the step's accepted calls to today's count", async () => {
+    const { registry, counter } = createFixture();
+    counter.setCallsToday("read_note", 4);
+
+    const resolutions = await registry.resolveToolCalls({
+      task: TASK,
+      calls: steps("a", "b"),
+      callsThisRunByToolName: new Map(),
+    });
+
+    expect(resolutions.map((resolution) => resolution.ok)).toEqual([true, false]);
+  });
+
+  it("adds the step's accepted calls to the run's earlier calls", async () => {
+    const { registry } = createFixture();
+
+    const resolutions = await registry.resolveToolCalls({
+      task: TASK,
+      calls: steps("a", "b"),
+      callsThisRunByToolName: new Map([["read_note", 2]]),
+    });
+
+    expect(resolutions.map((resolution) => resolution.ok)).toEqual([true, false]);
+  });
+
+  it("does not count a refused call toward the calls after it", async () => {
+    const { registry } = createFixture({
+      policies: { read_note: { policy: "auto", maxCallsPerDay: 1 } },
+      tasks: { [TASK]: ["read_note"] },
+    });
+
+    const resolutions = await registry.resolveToolCalls({
+      task: TASK,
+      calls: [{ toolName: "read_note", input: {} }, ...steps("b")],
+      callsThisRunByToolName: new Map(),
+    });
+
+    expect(resolutions).toMatchObject([{ ok: false, problem: "TOOL_INPUT_INVALID" }, { ok: true }]);
+  });
+
+  it("reads today's count once per tool for a step (A15)", async () => {
+    const { registry, counter } = createFixture();
+
+    await registry.resolveToolCalls({
+      task: TASK,
+      calls: [...steps("a", "b", "c"), { toolName: "save_note", input: { text: "d" } }],
+      callsThisRunByToolName: new Map(),
+    });
+
+    expect(counter.requestedToolNames).toEqual(["read_note"]);
+  });
+
+  it("returns one resolution per call, in the order asked", async () => {
+    const { registry } = createFixture();
+
+    const resolutions = await registry.resolveToolCalls({
+      task: TASK,
+      calls: [
+        { toolName: "save_note", input: { text: "a" } },
+        { toolName: "delete_note", input: {} },
+        { toolName: "publish_note", input: { text: "b" } },
+      ],
+      callsThisRunByToolName: new Map(),
+    });
+
+    expect(resolutions).toMatchObject([
+      { ok: true, value: { toolName: "save_note" } },
+      { ok: false, problem: "TOOL_NOT_FOUND" },
+      { ok: true, value: { toolName: "publish_note", pausesRun: true } },
+    ]);
+  });
+});
+
 describe("executeToolCall", () => {
   async function resolve(registry: ReturnType<typeof createFixture>["registry"], toolName: string) {
-    const resolution = await registry.resolveToolCall(request(toolName));
+    const resolution = await resolveOne(registry, toolName);
     if (!resolution.ok) {
       throw new Error(`expected ${toolName} to resolve`);
     }
@@ -367,7 +472,7 @@ describe("executeToolCall", () => {
 
     const execution = await registry.executeToolCall(resolved);
 
-    expect(execution).toEqual({ ok: true, value: { note: "hi" } });
+    expect(execution).toEqual({ ok: true, value: '{"note":"hi"}' });
     expect(readTool.handledInputs).toEqual([{ text: "hello" }]);
   });
 
@@ -377,7 +482,7 @@ describe("executeToolCall", () => {
 
     const execution = await registry.executeToolCall(resolved);
 
-    expect(execution).toEqual({ ok: true, value: { done: true } });
+    expect(execution).toEqual({ ok: true, value: '{"done":true}' });
     expect(proposeTool.handledInputs).toEqual([{ text: "hello" }]);
   });
 
@@ -422,6 +527,39 @@ describe("executeToolCall", () => {
       "tool call was not resolved here or already executed: save_note",
     );
     expect(second.writeTool.handledInputs).toEqual([]);
+  });
+
+  it.each([
+    [MAX_TOOL_OUTPUT_CHARS, true],
+    [MAX_TOOL_OUTPUT_CHARS + 1, false],
+  ])("with an output of %i characters, returns it: %s (review fixes, D-9)", async (length, ok) => {
+    // `{"text":""}` is 11 characters; the rest is the text.
+    const output = { text: "x".repeat(length - 11) };
+    const bigTool = createFakeTool({ name: "read_note", effect: "read", output });
+    const registry = createToolRegistry({
+      tools: [bigTool.tool],
+      policyConfig: {
+        policies: { read_note: { policy: "auto" } },
+        tasks: { [TASK]: ["read_note"] },
+      },
+      countCallsToday: createInMemoryToolCallCounter().countCallsToday,
+    });
+    const resolved = await resolve(registry, "read_note");
+
+    const execution = await registry.executeToolCall(resolved);
+
+    if (ok) {
+      expect(execution).toEqual({ ok: true, value: JSON.stringify(output) });
+      expect(JSON.stringify(output)).toHaveLength(length);
+    } else {
+      expect(execution).toEqual({
+        ok: false,
+        problem: "TOOL_OUTPUT_TOO_LARGE",
+        message:
+          "The tool ran, but its result is too large to return. Ask for less, for example a narrower range.",
+      });
+    }
+    expect(bigTool.handledInputs).toHaveLength(1);
   });
 
   it("turns a failing handler into an error result without its internals (conventions §15.4)", async () => {

@@ -13,7 +13,12 @@ import {
   type ModelRegistry,
 } from "../llm";
 import type { Clock } from "../shared";
-import type { ResolvedToolCall, ToolCallRefusal, ToolRegistry } from "../tools";
+import {
+  type ResolvedToolCall,
+  TOOL_PROBLEM_MESSAGES,
+  type ToolCallRefusal,
+  type ToolRegistry,
+} from "../tools";
 import type { AgentProblem } from "./agent.errors";
 import {
   addCallUsage,
@@ -54,16 +59,20 @@ export interface AgentLoopDependencies {
   readonly sleep: Sleep;
 }
 
-/** How one model call ended, after any retries. */
+/** How one model call ended, after any retries; a run limit can end it too (fix 1.3). */
 type ModelCallResult =
   | { readonly kind: "completed"; readonly response: LlmResponse }
-  | { readonly kind: "failed"; readonly problem: LlmProblem }
+  | { readonly kind: "failed"; readonly problem: LlmProblem | AgentProblem }
   | { readonly kind: "cancelled" };
 
-/** A tool call that was refused, or resolved and waiting to execute or to be approved. */
+/**
+ * A tool call that was refused, resolved and waiting to execute or to be approved, or deferred
+ * because an earlier call of its step waits for the owner (review fixes, D-6).
+ */
 type CheckedToolCall =
   | { readonly call: LlmToolCallPart; readonly refusal: ToolCallRefusal }
-  | { readonly call: LlmToolCallPart; readonly resolved: ResolvedToolCall };
+  | { readonly call: LlmToolCallPart; readonly resolved: ResolvedToolCall }
+  | { readonly call: LlmToolCallPart; readonly deferred: true };
 
 /** A checked tool call after it was refused, executed or turned into a pending action. */
 interface PerformedToolCall {
@@ -97,6 +106,9 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
 
   async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     const { runId, task, cancelSignal } = input;
+    // Read through a function: after one check, TypeScript would treat `aborted` as fixed,
+    // though a cancel can arrive during any await.
+    const isCancelled = (): boolean => cancelSignal.aborted;
     const priorTotals = input.priorTotals ?? ZERO_RUN_TOTALS;
     const enteredRunningAtMs = clock.now().getTime();
     let totals = priorTotals;
@@ -138,12 +150,23 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
       input: input.input,
     });
     const messages: LlmMessage[] = [...context.messages];
-    const callCountByToolName = new Map<string, number>();
+    // Calls accepted in this run, by tool name, so per-run limits hold across a pause
+    // (review fixes, D-5).
+    const callCountByToolName = new Map<string, number>(input.priorToolCallCounts ?? []);
 
-    /** One model call with the retry policy of plan D-9. Every attempt is recorded (BR-23). */
+    /**
+     * One model call with the retry policy of phase-1 plan, D-9. Every attempt is recorded
+     * (BR-23). The run's limits are checked after a failed attempt and before a retry, so a limit
+     * reached during a call or a wait ends the run with its own code (fix 1.3).
+     */
     async function callModel(stepNumber: number): Promise<ModelCallResult> {
       for (let attempt = 1; ; attempt += 1) {
         refreshRunningTime();
+        // The first attempt was checked by the loop just before; a retry follows a wait.
+        const limitBeforeAttempt = attempt === 1 ? undefined : findReachedLimit(totals, limits);
+        if (limitBeforeAttempt !== undefined) {
+          return { kind: "failed", problem: limitBeforeAttempt };
+        }
         const startedAtMs = clock.now().getTime();
         let hasEmittedContent = false;
         let response: LlmResponse | undefined;
@@ -170,7 +193,9 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
           if (!(error instanceof LlmError)) {
             throw error;
           }
-          failure = error;
+          // An error after the completed response loses nothing: the answer is kept, and the
+          // call is neither failed nor paid for twice (fix 1.4).
+          failure = response === undefined ? error : undefined;
         }
 
         const usage = response?.usage ?? failure?.usage;
@@ -204,6 +229,13 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
           remainingRunMs: computeRemainingRunMs(totals, limits),
           randomValue: dependencies.random(),
         });
+        // A limit replaces the call's own problem only when the call would otherwise wait for a
+        // retry: a refusal or a cut-off answer keeps its code. The totals were refreshed above.
+        const wouldWait = decision.retry || decision.refusal === "exceeds_time_budget";
+        const limitAfterFailure = wouldWait ? findReachedLimit(totals, limits) : undefined;
+        if (limitAfterFailure !== undefined) {
+          return { kind: "failed", problem: limitAfterFailure };
+        }
         if (!decision.retry) {
           return { kind: "failed", problem };
         }
@@ -214,20 +246,37 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
       }
     }
 
-    /** Checks a requested call against the task's tools, its schema and its limits. */
-    async function checkToolCall(call: LlmToolCallPart): Promise<CheckedToolCall> {
-      const callsThisRun = callCountByToolName.get(call.toolName) ?? 0;
-      const resolution = await toolRegistry.resolveToolCall({
+    /**
+     * Checks a step's calls against the task's tools, their schemas and their limits. Once a
+     * call pauses the run, the calls after it are deferred: they wait for the owner's decision
+     * and do not count toward any limit (review fixes, D-6).
+     */
+    async function checkToolCalls(
+      calls: readonly LlmToolCallPart[],
+    ): Promise<readonly CheckedToolCall[]> {
+      const resolutions = await toolRegistry.resolveToolCalls({
         task,
-        toolName: call.toolName,
-        input: call.input,
-        callsThisRun,
+        calls: calls.map((call) => ({ toolName: call.toolName, input: call.input })),
+        callsThisRunByToolName: callCountByToolName,
       });
-      if (!resolution.ok) {
-        return { call, refusal: resolution };
+      const checkedCalls: CheckedToolCall[] = [];
+      let isAfterPausingCall = false;
+      for (const [index, call] of calls.entries()) {
+        const resolution = resolutions[index];
+        if (resolution === undefined) {
+          throw new Error(`tool registry returned no resolution for call ${index + 1}`);
+        }
+        if (isAfterPausingCall) {
+          checkedCalls.push({ call, deferred: true });
+        } else if (resolution.ok) {
+          callCountByToolName.set(call.toolName, (callCountByToolName.get(call.toolName) ?? 0) + 1);
+          checkedCalls.push({ call, resolved: resolution.value });
+          isAfterPausingCall = resolution.value.pausesRun;
+        } else {
+          checkedCalls.push({ call, refusal: resolution });
+        }
       }
-      callCountByToolName.set(call.toolName, callsThisRun + 1);
-      return { call, resolved: resolution.value };
+      return checkedCalls;
     }
 
     /** Executes a checked call, or turns an `approve` call into a pending action (BR-02). */
@@ -239,7 +288,10 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
       const startedAtMs = clock.now().getTime();
       let result: ToolCallResultRecord;
 
-      if ("refusal" in checked) {
+      if ("deferred" in checked) {
+        const problem = "TOOL_CALL_DEFERRED";
+        result = { status: "refused", problem, message: TOOL_PROBLEM_MESSAGES[problem] };
+      } else if ("refusal" in checked) {
         const { problem, message } = checked.refusal;
         result = { status: "refused", problem, message };
       } else if (checked.resolved.pausesRun) {
@@ -253,9 +305,15 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
         result = { status: "pending_approval", pendingActionId: pending.pendingActionId };
       } else {
         const execution = await toolRegistry.executeToolCall(checked.resolved);
+        // The cause is kept for logs only; the model is told the problem and its message (§14).
         result = execution.ok
-          ? { status: "completed", output: JSON.stringify(execution.value) }
-          : { status: "refused", problem: execution.problem, message: execution.message };
+          ? { status: "completed", output: execution.value }
+          : {
+              status: "refused",
+              problem: execution.problem,
+              message: execution.message,
+              ...(execution.cause === undefined ? {} : { cause: execution.cause }),
+            };
       }
       return { checked, result, durationMs: clock.now().getTime() - startedAtMs };
     }
@@ -300,11 +358,7 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
       stepNumber: number,
       calls: readonly LlmToolCallPart[],
     ): Promise<readonly HandledToolCall[]> {
-      // Checked one at a time, so each call counts toward the limits of the next.
-      const checkedCalls: CheckedToolCall[] = [];
-      for (const call of calls) {
-        checkedCalls.push(await checkToolCall(call));
-      }
+      const checkedCalls = await checkToolCalls(calls);
       const effects = checkedCalls.flatMap((checked) =>
         "resolved" in checked ? [checked.resolved.effect] : [],
       );
@@ -354,9 +408,22 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
       messages.push({ role: "assistant", content });
 
       const toolCalls = content.filter(isToolCall);
+      const answer = joinText(content);
+      if (toolCalls.length === 0 && answer.trim() !== "") {
+        // A finished answer is never discarded, even when this call crossed a budget or the
+        // owner cancelled while it was written: nothing is left to stop.
+        return finish({ status: "succeeded", answer });
+      }
+
+      // A cancel that came while the model was answering stops the step's tools, and wins over
+      // a blank answer (fix 1.1).
+      if (isCancelled()) {
+        return finish({ status: "cancelled" });
+      }
+
       if (toolCalls.length === 0) {
-        // A finished answer is never discarded, even when this call crossed a budget.
-        return finish({ status: "succeeded", answer: joinText(content) });
+        // A blank answer is not an answer, and is not retried (review fixes, D-7).
+        return fail("RUN_EMPTY_ANSWER");
       }
 
       // The results could not be sent to the model, so the tools do not run (owner, 2026-11-12).

@@ -43,7 +43,15 @@ export interface AgentRunInput {
   readonly input: readonly RunInputPart[];
   /** What the run used before it was paused; a new run starts at zero. */
   readonly priorTotals?: RunTotals | undefined;
-  /** Aborted when the owner cancels: honoured between steps and during a retry wait. */
+  /**
+   * Calls of each tool the run accepted before it was paused, so per-run limits hold across a
+   * pause (review fixes, D-5). A new run has none.
+   */
+  readonly priorToolCallCounts?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Aborted when the owner cancels: honoured between steps, during a retry wait, and when a
+   * model call returns, before its tools run.
+   */
   readonly cancelSignal: AbortSignal;
 }
 
@@ -64,7 +72,7 @@ export interface AgentRunResult {
 export interface LlmCallRecord {
   readonly runId: string;
   readonly stepNumber: number;
-  /** 1 for the first try; retries count up (plan D-9). */
+  /** 1 for the first try; retries count up (phase-1 plan, D-9). */
   readonly attempt: number;
   readonly provider: string;
   readonly model: string;
@@ -87,7 +95,16 @@ export interface AgentStepRecord {
 /** What happened to one tool call the model asked for. */
 export type ToolCallResultRecord =
   | { readonly status: "completed"; readonly output: string }
-  | { readonly status: "refused"; readonly problem: ToolCallProblem; readonly message: string }
+  | {
+      readonly status: "refused";
+      readonly problem: ToolCallProblem;
+      readonly message: string;
+      /**
+       * The original error of a failed handler. For the logger only, with redaction (KP-16,
+       * conventions §14): never shown to the model, and never written to the database.
+       */
+      readonly cause?: unknown;
+    }
   | { readonly status: "pending_approval"; readonly pendingActionId: string };
 
 /** One tool call, as recorded (BR-23). */

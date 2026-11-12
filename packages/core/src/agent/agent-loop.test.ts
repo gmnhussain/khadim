@@ -23,6 +23,8 @@ import {
   createGetCurrentTimeTool,
   createToolRegistry,
   defineTool,
+  MAX_TOOL_OUTPUT_CHARS,
+  TOOL_PROBLEM_MESSAGES,
   type ToolDefinition,
 } from "../tools";
 import { createFakeTool, createInMemoryToolCallCounter } from "../tools/testing";
@@ -37,6 +39,11 @@ const SYSTEM_PROMPT: PromptFile = { version: "system.v1", text: "You are Khadim.
 /** FAKE_LLM_USAGE on the sample chat route: 100 × 0.1 + 20 × 0.5 micro-USD. */
 const FAKE_CALL_COST = 20;
 const FAKE_CALL_TOKENS = 120;
+const REASONING_ONLY: LlmReasoningPart = {
+  type: "reasoning",
+  providerId: "anthropic",
+  payload: { signature: "abc" },
+};
 
 interface FixtureOptions {
   readonly steps: readonly FakeLlmStep[];
@@ -398,6 +405,110 @@ describe("runAgent: answers and tools", () => {
   });
 });
 
+describe("runAgent: tool limits, failures and outputs", () => {
+  it("holds the per-day limit within one step: earlier accepted calls count (review fixes, D-1)", async () => {
+    const fixture = createFixture({
+      steps: [
+        reply(
+          createToolCallResponse([
+            { toolCallId: "call_1", toolName: "read_note", input: { text: "a" } },
+            { toolCallId: "call_2", toolName: "read_note", input: { text: "b" } },
+            { toolCallId: "call_3", toolName: "read_note", input: { text: "c" } },
+          ]),
+        ),
+        reply(createTextResponse("Done.")),
+      ],
+      policies: { read_note: { policy: "auto", maxCallsPerDay: 1 } },
+    });
+
+    await fixture.run();
+
+    expect(fixture.readTool.handledInputs).toEqual([{ text: "a" }]);
+    expect(fixture.runStore.toolCalls.map((call) => call.result)).toMatchObject([
+      { status: "completed" },
+      { status: "refused", problem: "TOOL_LIMIT_REACHED" },
+      { status: "refused", problem: "TOOL_LIMIT_REACHED" },
+    ]);
+  });
+
+  it("keeps a resumed run's per-run tool limit: earlier calls come in the run input (review fixes, D-5)", async () => {
+    const fixture = createFixture({
+      steps: [reply(toolCall("read_note")), reply(createTextResponse("Done."))],
+      policies: { read_note: { policy: "auto", maxCallsPerRun: 2 } },
+    });
+
+    await fixture.run({ priorToolCallCounts: new Map([["read_note", 2]]) });
+
+    expect(fixture.readTool.handledInputs).toEqual([]);
+    expect(fixture.runStore.toolCalls).toMatchObject([
+      { result: { status: "refused", problem: "TOOL_LIMIT_REACHED" } },
+    ]);
+  });
+
+  it("records a failing handler's error for logs and never shows it to the model (fix 1.8)", async () => {
+    const cause = new Error("secret detail");
+    const failing = createFakeTool({ name: "load_note", effect: "read", failure: cause });
+    const fixture = createFixture({
+      steps: [reply(toolCall("load_note")), reply(createTextResponse("It failed."))],
+      extraTools: [failing.tool],
+    });
+
+    await fixture.run();
+
+    expect(fixture.runStore.toolCalls[0]?.result).toEqual({
+      status: "refused",
+      problem: "TOOL_EXECUTION_FAILED",
+      message: "The tool failed. Try again, or continue without it.",
+      cause,
+    });
+    const toolMessage = fixture.fakeLlm.requests[1]?.messages.at(-1);
+    expect(toolMessage).toMatchObject({
+      content: [{ isError: true, output: "The tool failed. Try again, or continue without it." }],
+    });
+    expect(JSON.stringify(toolMessage)).not.toContain("secret detail");
+  });
+
+  it("returns a too-large output to the model as an error result (review fixes, D-9)", async () => {
+    const bigTool = createFakeTool({
+      name: "load_note",
+      effect: "read",
+      output: { text: "x".repeat(MAX_TOOL_OUTPUT_CHARS) },
+    });
+    const fixture = createFixture({
+      steps: [reply(toolCall("load_note")), reply(createTextResponse("Too big."))],
+      extraTools: [bigTool.tool],
+    });
+
+    const result = await fixture.run();
+
+    expect(result.outcome.status).toBe("succeeded");
+    expect(fixture.fakeLlm.requests[1]?.messages.at(-1)?.content[0]).toMatchObject({
+      isError: true,
+      output: TOOL_PROBLEM_MESSAGES.TOOL_OUTPUT_TOO_LARGE,
+    });
+    expect(fixture.runStore.toolCalls).toMatchObject([
+      { result: { status: "refused", problem: "TOOL_OUTPUT_TOO_LARGE" } },
+    ]);
+  });
+
+  it.each<[string, LlmResponse]>([
+    ["only reasoning", { ...createTextResponse("x"), content: [REASONING_ONLY] }],
+    ["empty text", createTextResponse("")],
+    ["only whitespace", createTextResponse("  \n ")],
+  ])(
+    "fails with RUN_EMPTY_ANSWER, not retried, for a reply with %s (review fixes, D-7)",
+    async (_, response) => {
+      const fixture = createFixture({ steps: [reply(response)] });
+
+      const result = await fixture.run();
+
+      expect(result.outcome).toEqual({ status: "failed", problem: "RUN_EMPTY_ANSWER" });
+      expect(fixture.fakeLlm.requests).toHaveLength(1);
+      expect(fixture.runStore.steps).toHaveLength(1);
+    },
+  );
+});
+
 describe("runAgent: tool order", () => {
   function createOrderTool(name: string, effect: "read" | "local_write", log: string[]) {
     return defineTool({
@@ -519,6 +630,64 @@ describe("runAgent: approval (BR-02)", () => {
     ]);
   });
 
+  it("defers the calls after an approve call: they wait for the owner's decision (review fixes, D-6)", async () => {
+    const fixture = createFixture({
+      steps: [
+        reply(
+          createToolCallResponse([
+            { toolCallId: "call_1", toolName: "read_note", input: { text: "before" } },
+            { toolCallId: "call_2", toolName: "publish_note", input: { text: "post" } },
+            { toolCallId: "call_3", toolName: "save_note", input: { text: "published" } },
+            { toolCallId: "call_4", toolName: "delete_note", input: {} },
+          ]),
+        ),
+      ],
+    });
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({
+      status: "awaiting_approval",
+      pendingActionIds: ["pending_1"],
+    });
+    expect(fixture.readTool.handledInputs).toEqual([{ text: "before" }]);
+    expect(fixture.writeTool.handledInputs).toEqual([]);
+    expect(fixture.runStore.toolCalls.map((call) => call.result)).toMatchObject([
+      { status: "completed" },
+      { status: "pending_approval" },
+      { status: "refused", problem: "TOOL_CALL_DEFERRED" },
+      { status: "refused", problem: "TOOL_CALL_DEFERRED" },
+    ]);
+    expect(fixture.runStore.toolCalls[2]).toMatchObject({
+      input: { text: "published" },
+      policy: undefined,
+      result: { message: TOOL_PROBLEM_MESSAGES.TOOL_CALL_DEFERRED },
+    });
+  });
+
+  it("does not count a deferred call toward the per-run limit", async () => {
+    const fixture = createFixture({
+      steps: [
+        reply(
+          createToolCallResponse([
+            { toolCallId: "call_1", toolName: "publish_note", input: { text: "post" } },
+            { toolCallId: "call_2", toolName: "save_note", input: { text: "deferred" } },
+            { toolCallId: "call_3", toolName: "save_note", input: { text: "deferred" } },
+          ]),
+        ),
+      ],
+      policies: { save_note: { policy: "auto", maxCallsPerRun: 1 } },
+    });
+
+    await fixture.run();
+
+    expect(fixture.runStore.toolCalls.map((call) => call.result)).toMatchObject([
+      { status: "pending_approval" },
+      { problem: "TOOL_CALL_DEFERRED" },
+      { problem: "TOOL_CALL_DEFERRED" },
+    ]);
+  });
+
   it("creates no pending action for an approve call with invalid input", async () => {
     const fixture = createFixture({
       steps: [reply(toolCall("publish_note", {})), reply(createTextResponse("Sorry."))],
@@ -626,6 +795,76 @@ describe("runAgent: limits (BR-21)", () => {
     expect(fixture.runStore.toolCalls).toMatchObject([{ durationMs: 120_000 }]);
   });
 
+  it("fails with RUN_TIME_LIMIT when a call is cut off by the run's remaining time (fix 1.3)", async () => {
+    const scripted = createFakeLlmProvider({ steps: [failure(new LlmError("LLM_UNAVAILABLE"))] });
+    let advance: (milliseconds: number) => void = () => undefined;
+    const provider: LlmProvider = {
+      ...scripted.provider,
+      stream(request) {
+        advance(request.timeoutMs);
+        return scripted.provider.stream(request);
+      },
+    };
+    const fixture = createFixture({ steps: [], provider });
+    advance = fixture.clock.advanceBy;
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({ status: "failed", problem: "RUN_TIME_LIMIT" });
+    expect(scripted.requests).toHaveLength(1);
+    expect(fixture.runStore.llmCalls).toMatchObject([{ problem: "LLM_UNAVAILABLE" }]);
+  });
+
+  it("sends no retry when the wait ran into the time limit (fix 1.3)", async () => {
+    let advance: (milliseconds: number) => void = () => undefined;
+    const fixture = createFixture({
+      steps: [failure(new LlmError("LLM_UNAVAILABLE")), reply(createTextResponse("Hi"))],
+      // The wait overshoots: the backoff is 500 ms and the sleep returns at the limit.
+      onSleep: (delayMs) => {
+        advance(DEFAULT_RUN_LIMITS.maxRunningMs - delayMs);
+      },
+    });
+    advance = fixture.clock.advanceBy;
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({ status: "failed", problem: "RUN_TIME_LIMIT" });
+    expect(fixture.fakeLlm.requests).toHaveLength(1);
+  });
+
+  it.each<[string, Partial<RunLimits>]>([
+    ["RUN_BUDGET_EXCEEDED", { maxCostMicroUsd: FAKE_CALL_COST }],
+    ["RUN_TOKEN_LIMIT", { maxTokens: FAKE_CALL_TOKENS }],
+  ])(
+    "fails with %s, not retried, when a failed attempt's usage reaches the limit (fix 1.3)",
+    async (problem, limits) => {
+      const fixture = createFixture({
+        steps: [
+          failure(new LlmError("LLM_UNAVAILABLE", { usage: FAKE_LLM_USAGE })),
+          reply(createTextResponse("Hi")),
+        ],
+        limits,
+      });
+
+      const result = await fixture.run();
+
+      expect(result.outcome).toEqual({ status: "failed", problem });
+      expect(fixture.fakeLlm.requests).toHaveLength(1);
+      expect(fixture.fakeSleep.delays).toEqual([]);
+    },
+  );
+
+  it("keeps a refusal's own problem when its usage reaches the budget", async () => {
+    const fixture = createFixture({
+      steps: [failure(new LlmError("LLM_REFUSED", { usage: FAKE_LLM_USAGE }))],
+      limits: { maxCostMicroUsd: FAKE_CALL_COST },
+    });
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({ status: "failed", problem: "LLM_REFUSED" });
+  });
+
   it("starts from what the run used before it paused, and stops at once when that is a limit", async () => {
     const fixture = createFixture({ steps: [] });
 
@@ -696,7 +935,80 @@ describe("runAgent: cancellation", () => {
   });
 });
 
-describe("runAgent: model failures and retries (plan D-9)", () => {
+describe("runAgent: cancel during a model call (fix 1.1)", () => {
+  function cancellingProvider(steps: readonly FakeLlmStep[], cancel: () => void): LlmProvider {
+    const scripted = createFakeLlmProvider({ steps });
+    return {
+      ...scripted.provider,
+      stream(request) {
+        cancel();
+        return scripted.provider.stream(request);
+      },
+    };
+  }
+
+  it("ends cancelled before any tool runs or a pending action is requested", async () => {
+    let cancelRun: () => void = () => undefined;
+    const provider = cancellingProvider(
+      [
+        reply(
+          createToolCallResponse([
+            { toolCallId: "call_1", toolName: "save_note", input: { text: "draft" } },
+            { toolCallId: "call_2", toolName: "publish_note", input: { text: "post" } },
+          ]),
+        ),
+      ],
+      () => {
+        cancelRun();
+      },
+    );
+    const fixture = createFixture({ steps: [], provider });
+    cancelRun = () => {
+      fixture.cancel.abort();
+    };
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({ status: "cancelled" });
+    expect(fixture.writeTool.handledInputs).toEqual([]);
+    expect(fixture.pendingActions.requests).toEqual([]);
+    expect(fixture.runStore.toolCalls).toEqual([]);
+    expect(fixture.runStore.writes).toEqual(["llm_call", "step", "outcome"]);
+    expect(result.totals.costMicroUsd).toBe(FAKE_CALL_COST);
+  });
+
+  it("keeps a final answer written while the cancel came: nothing is left to stop", async () => {
+    let cancelRun: () => void = () => undefined;
+    const provider = cancellingProvider([reply(createTextResponse("Done."))], () => {
+      cancelRun();
+    });
+    const fixture = createFixture({ steps: [], provider });
+    cancelRun = () => {
+      fixture.cancel.abort();
+    };
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({ status: "succeeded", answer: "Done." });
+  });
+
+  it("ends cancelled, not RUN_EMPTY_ANSWER, when the call returns a blank answer", async () => {
+    let cancelRun: () => void = () => undefined;
+    const provider = cancellingProvider([reply(createTextResponse(""))], () => {
+      cancelRun();
+    });
+    const fixture = createFixture({ steps: [], provider });
+    cancelRun = () => {
+      fixture.cancel.abort();
+    };
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({ status: "cancelled" });
+  });
+});
+
+describe("runAgent: model failures and retries (phase-1 plan, D-9)", () => {
   it("ends failed with LLM_REFUSED, not retried, with the call recorded and no step (plan D-8)", async () => {
     const fixture = createFixture({
       steps: [failure(new LlmError("LLM_REFUSED", { usage: FAKE_LLM_USAGE }))],
@@ -900,6 +1212,24 @@ describe("runAgent: model failures and retries (plan D-9)", () => {
     expect(fixture.runStore.llmCalls).toMatchObject([
       { attempt: 1, problem: "LLM_UNAVAILABLE" },
       { attempt: 2, problem: undefined },
+    ]);
+  });
+
+  it("keeps the answer and does not retry when the stream fails after its completed event (fix 1.4)", async () => {
+    const response = createTextResponse("Hi");
+    const fixture = createFixture({
+      steps: [
+        failure(new LlmError("LLM_UNAVAILABLE"), [{ type: "completed", response }]),
+        reply(createTextResponse("Paid twice")),
+      ],
+    });
+
+    const result = await fixture.run();
+
+    expect(result.outcome).toEqual({ status: "succeeded", answer: "Hi" });
+    expect(fixture.fakeLlm.requests).toHaveLength(1);
+    expect(fixture.runStore.llmCalls).toMatchObject([
+      { attempt: 1, problem: undefined, stopReason: "end_turn", costMicroUsd: FAKE_CALL_COST },
     ]);
   });
 

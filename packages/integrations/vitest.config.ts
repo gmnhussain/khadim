@@ -10,7 +10,7 @@ export default mergeConfig(
     test: {
       projects: [
         {
-          // Not a test project: the owner runs it by hand to record fixtures (plan D-6). No
+          // Not a test project: the owner runs it by hand to record fixtures (phase-1 plan, D-6). No
           // test script includes it, so no test run ever calls a real model.
           extends: true,
           test: {

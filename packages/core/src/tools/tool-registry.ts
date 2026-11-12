@@ -21,12 +21,17 @@ export interface ToolRegistryDependencies {
 }
 
 /** One tool call the model asked for. */
-export interface ToolCallRequest {
-  readonly task: string;
+export interface RequestedToolCall {
   readonly toolName: string;
   readonly input: unknown;
-  /** Calls of this tool already accepted in this run, including earlier ones in this step. */
-  readonly callsThisRun: number;
+}
+
+/** Every tool call of one step, in the order the model asked for them. */
+export interface ToolCallsRequest {
+  readonly task: string;
+  readonly calls: readonly RequestedToolCall[];
+  /** Calls of each tool accepted in this run before this step; a tool not listed has none. */
+  readonly callsThisRunByToolName: ReadonlyMap<string, number>;
 }
 
 /** A tool call that passed every check. `input` is the validated input. */
@@ -48,20 +53,34 @@ export interface ToolCallRefusal {
   readonly cause?: unknown;
 }
 
-/** Result of `resolveToolCall`. */
+/** The result of one call in `resolveToolCalls`. */
 export type ToolCallResolution =
   { readonly ok: true; readonly value: ResolvedToolCall } | ToolCallRefusal;
 
-/** Result of `executeToolCall`. */
-export type ToolCallExecution = { readonly ok: true; readonly value: ToolOutput } | ToolCallRefusal;
+/** Result of `executeToolCall`: the output as JSON text, ready for the model. */
+export type ToolCallExecution = { readonly ok: true; readonly value: string } | ToolCallRefusal;
 
 interface ClassifiedTool {
   readonly tool: ToolDefinition;
   readonly entry: ToolPolicyEntry;
 }
 
+/** A requested call that is offered to the task and has valid input, before its limits. */
+interface PreparedToolCall {
+  readonly ok: true;
+  readonly classified: ClassifiedTool;
+  readonly input: unknown;
+  readonly execute: () => Promise<ToolOutput>;
+}
+
 /** More issues than this add noise without helping the model fix its input. */
 const MAX_REPORTED_ISSUES = 5;
+
+/**
+ * The longest tool output, in characters of JSON, that goes back to the model: about 4,000
+ * tokens. Outputs are compact (conventions §15.4); a larger one is refused (review fixes, D-9).
+ */
+export const MAX_TOOL_OUTPUT_CHARS = 16_000;
 
 function refuse(problem: ToolCallProblem, detail?: string): ToolCallRefusal {
   const message = TOOL_PROBLEM_MESSAGES[problem];
@@ -136,39 +155,86 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies) {
     }));
   }
 
-  /** Checks one requested call: offered to this task, valid input, within its limits. */
-  async function resolveToolCall(request: ToolCallRequest): Promise<ToolCallResolution> {
-    const classified = classifiedByTask.get(request.task)?.get(request.toolName);
+  /** Checks that a call is offered to the task and that its input is valid. */
+  function prepareToolCall(
+    task: string,
+    call: RequestedToolCall,
+  ): PreparedToolCall | ToolCallRefusal {
+    const classified = classifiedByTask.get(task)?.get(call.toolName);
     if (classified === undefined) {
       return refuse("TOOL_NOT_FOUND");
     }
-    const { tool, entry } = classified;
-
-    const prepared = tool.prepare(request.input);
+    const prepared = classified.tool.prepare(call.input);
     if (!prepared.ok) {
       return refuse("TOOL_INPUT_INVALID", describeIssues(prepared.issues));
     }
-
-    const callsToday = entry.maxCallsPerDay === undefined ? 0 : await countCallsToday(tool.name);
-    const limitProblem = checkCallLimits(entry, { callsThisRun: request.callsThisRun, callsToday });
-    if (limitProblem !== undefined) {
-      return refuse(limitProblem);
-    }
-
-    const resolved: ResolvedToolCall = {
-      toolName: tool.name,
-      effect: tool.effect,
-      policy: entry.policy,
-      pausesRun: pausesRun(entry.policy),
-      input: prepared.input,
-    };
-    if (!resolved.pausesRun) {
-      executeByResolvedCall.set(resolved, prepared.execute);
-    }
-    return { ok: true, value: resolved };
+    return { ok: true, classified, input: prepared.input, execute: prepared.execute };
   }
 
-  /** Runs the handler of a resolved call, once. A failing handler becomes an error result. */
+  /** Today's count of each tool with a per-day limit, read once per tool and all at once. */
+  async function readCallsToday(
+    preparedCalls: readonly (PreparedToolCall | ToolCallRefusal)[],
+  ): Promise<ReadonlyMap<string, number>> {
+    const limitedToolNameSet = new Set(
+      preparedCalls.flatMap((prepared) =>
+        prepared.ok && prepared.classified.entry.maxCallsPerDay !== undefined
+          ? [prepared.classified.tool.name]
+          : [],
+      ),
+    );
+    const counts = await Promise.all(
+      [...limitedToolNameSet].map(
+        async (toolName) => [toolName, await countCallsToday(toolName)] as const,
+      ),
+    );
+    return new Map(counts);
+  }
+
+  /**
+   * Checks every call of a step: offered to this task, valid input, within its limits. Calls are
+   * checked in the order asked, and each accepted call counts toward the per-run and per-day
+   * limits of the calls after it (review fixes, D-1). Earlier steps are already in today's count.
+   */
+  async function resolveToolCalls(
+    request: ToolCallsRequest,
+  ): Promise<readonly ToolCallResolution[]> {
+    const preparedCalls = request.calls.map((call) => prepareToolCall(request.task, call));
+    const callsTodayByToolName = await readCallsToday(preparedCalls);
+    const acceptedThisStepByToolName = new Map<string, number>();
+
+    return preparedCalls.map((prepared): ToolCallResolution => {
+      if (!prepared.ok) {
+        return prepared;
+      }
+      const { tool, entry } = prepared.classified;
+      const acceptedThisStep = acceptedThisStepByToolName.get(tool.name) ?? 0;
+      const limitProblem = checkCallLimits(entry, {
+        callsThisRun: (request.callsThisRunByToolName.get(tool.name) ?? 0) + acceptedThisStep,
+        callsToday: (callsTodayByToolName.get(tool.name) ?? 0) + acceptedThisStep,
+      });
+      if (limitProblem !== undefined) {
+        return refuse(limitProblem);
+      }
+      acceptedThisStepByToolName.set(tool.name, acceptedThisStep + 1);
+
+      const resolved: ResolvedToolCall = {
+        toolName: tool.name,
+        effect: tool.effect,
+        policy: entry.policy,
+        pausesRun: pausesRun(entry.policy),
+        input: prepared.input,
+      };
+      if (!resolved.pausesRun) {
+        executeByResolvedCall.set(resolved, prepared.execute);
+      }
+      return { ok: true, value: resolved };
+    });
+  }
+
+  /**
+   * Runs the handler of a resolved call, once. A failing handler, or an output over
+   * `MAX_TOOL_OUTPUT_CHARS`, becomes an error result.
+   */
   async function executeToolCall(resolved: ResolvedToolCall): Promise<ToolCallExecution> {
     if (resolved.pausesRun) {
       // BR-02: an approve tool acts only through a pending action the owner approved.
@@ -179,14 +245,19 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies) {
       throw new Error(`tool call was not resolved here or already executed: ${resolved.toolName}`);
     }
     executeByResolvedCall.delete(resolved);
+    let output: ToolOutput;
     try {
-      return { ok: true, value: await execute() };
+      output = await execute();
     } catch (error) {
       return { ...refuse("TOOL_EXECUTION_FAILED"), cause: error };
     }
+    const serialized = JSON.stringify(output);
+    return serialized.length > MAX_TOOL_OUTPUT_CHARS
+      ? refuse("TOOL_OUTPUT_TOO_LARGE")
+      : { ok: true, value: serialized };
   }
 
-  return { listTools, resolveToolCall, executeToolCall };
+  return { listTools, resolveToolCalls, executeToolCall };
 }
 
 /** The tool registry, created once in a composition root. */

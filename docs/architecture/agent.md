@@ -15,14 +15,14 @@ stateDiagram-v2
   running --> succeeded: final answer
   running --> failed: error or limit reached
   queued --> cancelled
-  running --> cancelled: cancel honoured between steps
+  running --> cancelled: cancel honoured between steps or before a step's tools run
   awaiting_approval --> cancelled
   succeeded --> [*]
   failed --> [*]
   cancelled --> [*]
 ```
 
-- **Pause:** once every tool call in a step is handled and the step created at least one pending action, the run moves to `awaiting_approval` and its job ends. No worker waits.
+- **Pause:** once a step's calls are handled and the step created at least one pending action, the run moves to `awaiting_approval` and its job ends. No worker waits. The calls after a step's first `approve` call are not run: they are recorded as deferred (`TOOL_CALL_DEFERRED`), so the model can ask for them again after the owner's decision.
 - **Resume:** when each of that step's pending actions is executed, failed, rejected or expired, the outcomes become the tool results and an `agent.resume-run` job continues the loop. The model sees what happened ("published, post id …", "rejected by the owner"). Resolutions lock the run row, and the resume is written to the outbox by whichever resolution was last, so it happens exactly once (ADR-0013).
 - **Events:** the SSE response closes when the run pauses or ends; the web app reopens it when the run is running again (ADR-0013).
 - **Budgets:** the wall-clock limit counts running time only; waiting is bounded by pending action expiry (BR-05).
@@ -70,7 +70,7 @@ Events (`text.delta`, `tool.called`, `approval.required`, …) go to the run's R
 - **Limits** (BR-21): `MAX_AGENT_ITERATIONS`, per-run token and cost budgets, a wall-clock timeout. Each limit ends the run with its problem code (`RUN_ITERATION_LIMIT`, `RUN_BUDGET_EXCEEDED`, `RUN_TOKEN_LIMIT`, `RUN_TIME_LIMIT`; [agent feature doc](../product/features/agent.md#problem-codes)).
 - **Parallelism:** independent `read` tools may run in parallel; `local_write` and `external` tools run one at a time.
 - **Errors:** invalid tool input or a failing tool returns an error result to the model so it can correct itself. Provider rate limits and outages are retried by the loop under the retry rules of [§7](#retries); other provider errors fail the run.
-- **Cancellation** is checked between steps.
+- **Cancellation** is checked between steps, during a retry wait, and when a model call returns, before its tools run.
 
 ## 3. Context building
 

@@ -31,7 +31,7 @@ import { checkRequestBody, readReasoningWireValues } from "./testing/anthropic-w
 
 /**
  * The Anthropic adapter against the shared contract suite. Every fixture is hand-built from
- * Anthropic's documentation (plan D-6, recording deferred). When the recordings exist, the
+ * Anthropic's documentation (phase-1 plan, D-6, recording deferred). When the recordings exist, the
  * eight success fixtures below are replaced by them and the exact values expected here are
  * set to what was recorded; the suite itself does not change.
  */

@@ -13,12 +13,13 @@ describe("agent problems", () => {
     }
   });
 
-  it("has one code for each limit of BR-21", () => {
+  it("has one code for each limit of BR-21, and one for a blank answer (review fixes, D-7)", () => {
     expect(AGENT_PROBLEMS).toEqual([
       "RUN_ITERATION_LIMIT",
       "RUN_BUDGET_EXCEEDED",
       "RUN_TOKEN_LIMIT",
       "RUN_TIME_LIMIT",
+      "RUN_EMPTY_ANSWER",
     ]);
   });
 });

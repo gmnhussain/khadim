@@ -33,8 +33,8 @@ Slice 1a has no tables. The loop reads and writes through an injected run store 
 | Outcome | When |
 | --- | --- |
 | `succeeded` | The model gave a final answer |
-| `awaiting_approval` | A step created at least one pending action, after every tool call in that step was handled |
-| `cancelled` | A cancel was seen between steps or during a retry wait |
+| `awaiting_approval` | A step created at least one pending action, after the step's calls were handled; the calls after its first `approve` call are deferred (review fixes, D-6) |
+| `cancelled` | A cancel was seen between steps, during a retry wait, or when a model call returned asking for tools, which then do not run |
 | `failed` with a problem code | A limit was reached or a model call failed for good |
 
 ## Flows
@@ -50,7 +50,7 @@ flowchart TD
   limits -->|no| call[Call the model through LlmProvider]
   call --> result{Result}
   result -->|refusal| refused[Run failed: LLM_REFUSED]
-  result -->|error| retry{Retryable, nothing emitted,<br/>attempts left, delay shorter than<br/>the running time left?}
+  result -->|error| retry{Retryable, nothing emitted,<br/>attempts left, no run limit reached,<br/>delay shorter than the running time left?}
   retry -->|no| failedcall[Run failed with the mapped code]
   retry -->|yes| wait[Wait: backoff with jitter<br/>or retryAfterMs, whichever is longer]
   wait -->|cancel during wait| cancelled
@@ -89,7 +89,9 @@ The closed unions of conventions §12.1. "Documented" codes come from convention
 | `TOOL_INPUT_INVALID` | Documented | The model's input does not match the tool's schema | Error result to the model, which can fix it (§15.4) |
 | `TOOL_NOT_FOUND` | New | The model asked for a tool that is not offered to this run | Error result to the model |
 | `TOOL_LIMIT_REACHED` | New (illustrative in §12.1) | The tool reached its per-run or per-day call limit | Error result to the model |
-| `TOOL_EXECUTION_FAILED` | New | The tool's handler failed | Error result to the model, with a short message and no internals |
+| `TOOL_EXECUTION_FAILED` | New | The tool's handler failed | Error result to the model, with a short message and no internals; the original error goes to the run store for logs only |
+| `TOOL_OUTPUT_TOO_LARGE` | New (owner, 2026-11-12) | The tool's output is over `MAX_TOOL_OUTPUT_CHARS` (16,000 characters of JSON). The handler has run | Error result to the model, which can ask for less |
+| `TOOL_CALL_DEFERRED` | New (owner, 2026-11-12) | An earlier call in the same step waits for the owner's decision, so this call was not run | Error result to the model, which can ask for the call again after the decision |
 | `TOOL_UNCLASSIFIED` | New (illustrative in §12.1) | The tool has no owner-assigned tier and policy (ADR-0014) | Never offered to the model. A task that lists such a tool is rejected as configuration; the app does not start (fail closed, conventions §15.4) |
 | `TOOL_POLICY_INVALID` | New | A policy breaks the tier's allowed policies, for example `external` with `auto` (ADR-0011) | Configuration is rejected; the app does not start |
 
@@ -114,6 +116,7 @@ The closed unions of conventions §12.1. "Documented" codes come from convention
 | `RUN_BUDGET_EXCEEDED` | Documented | The run reached its cost budget (BR-21) | Run fails |
 | `RUN_TOKEN_LIMIT` | New (owner, 2026-11-12) | The run reached its token limit, counting input and output across all calls (BR-21) | Run fails |
 | `RUN_TIME_LIMIT` | New (owner, 2026-11-12) | The run reached its running-time limit (BR-21) | Run fails |
+| `RUN_EMPTY_ANSWER` | New (owner, 2026-11-12) | The model's final answer has no text, or only whitespace, and no tool call | Run fails; not retried |
 
 A failed run carries exactly one problem: an agent problem, or the LLM problem that ended its last model call. Tool problems never fail a run by themselves; a model that keeps failing a tool runs into the iteration limit.
 
@@ -122,11 +125,18 @@ A failed run carries exactly one problem: an agent problem, or the LLM problem t
 - **Invalid tool input, twice in a row:** each attempt returns `TOOL_INPUT_INVALID` to the model; nothing but the iteration limit bounds the attempts.
 - **Unknown tool name from the model:** `TOOL_NOT_FOUND` goes back as an error result. The name is checked with `Object.hasOwn` before any lookup (KP-08).
 - **Several tool calls in one step:** when every call is a `read` tool they run in parallel; otherwise the step's calls run one at a time in the order the model asked (§15.3, ADR-0011).
-- **A step with both an `auto` and an `approve` call:** every call is handled first; the run then pauses (agent design §1).
+- **A step with both an `auto` and an `approve` call:** the calls before the first `approve` call run; the `approve` call becomes a pending action; each call after it is not run and the model receives `TOOL_CALL_DEFERRED`, so it can ask again after the owner's decision. The run then pauses (agent design §1; owner, 2026-11-12, which replaced "every call is handled first").
+- **Several calls of a tool with a per-day limit in one step:** each accepted call counts toward the next, so the step cannot pass the limit. Two runs at the same time can, until 1b's reservation.
+- **A run resumed after a pause:** it is given the calls of each tool it accepted before the pause, so per-run limits hold across the pause.
+- **A tool output over 16,000 characters of JSON:** the model receives `TOOL_OUTPUT_TOO_LARGE`, which says the tool ran.
 - **Stream fails before any text or tool call:** retried under D-9. Provider metadata (start, ping, usage) does not count as emitted.
 - **Stream fails after text or a tool call was emitted:** the step fails with the mapped code; no retry (D-9 rule 2).
 - **Retry delay not shorter than the remaining running time:** the run fails without waiting, with `LLM_RATE_LIMITED` or `LLM_UNAVAILABLE`, whichever the call returned. A call is retried only when its delay, from the backoff or from `retryAfterMs`, is strictly shorter than the running time left; a wait that ends exactly at the limit leaves no time for the call (D-9 rule 1; owner, 2026-11-12).
 - **Cancel during a retry wait:** the wait ends at once and the run ends as `cancelled` (D-9 rule 5).
+- **Cancel during a model call:** the call finishes and is recorded. If it asked for tools, none runs, no pending action is requested and the run ends `cancelled`. A final answer with text is kept and the run succeeds, because nothing is left to stop; a blank answer ends the run `cancelled`, not `RUN_EMPTY_ANSWER` (owner, 2026-11-12).
+- **A run limit reached during a call or a retry wait:** a call that would otherwise be retried is not, and the run fails with the limit's code; a call cut off by the remaining running time fails with `RUN_TIME_LIMIT`. A non-retryable problem, such as `LLM_REFUSED`, keeps its own code.
+- **An error after the completed response:** the response is kept, and the call is neither retried nor paid for twice.
+- **A final answer with no text:** empty, only whitespace or only reasoning; the run fails with `RUN_EMPTY_ANSWER` and is not retried.
 - **History inside a run:** append-only in 1a. Nothing is trimmed or summarised, and reasoning parts go back to the provider exactly as received; trimming and summarising are decided in the 1b plan (owner, 2026-11-12).
 - **Context larger than the model's limit:** the run fails with `LLM_CONTEXT_EXCEEDED` (owner, 2026-11-12).
 - **Call stopped at its maximum output:** the run fails with `LLM_OUTPUT_TRUNCATED`; the cut-off text is not returned and a cut-off tool call is not executed (owner, 2026-11-12).
@@ -148,6 +158,9 @@ All are proved by unit tests with `FakeLlmProvider`, an in-memory run store, a f
 - **Time limit.** Given running time that reaches the limit, then the run ends `failed` with `RUN_TIME_LIMIT` and no further model call is made.
 - **Final answer over budget.** Given a final answer from the call that crosses the cost or token budget, then the run ends `succeeded`: a budget stops the next call and never discards a finished answer.
 - **Cancellation between steps.** Given a cancel requested while a step runs, when the step finishes, then the run ends `cancelled` before the next model call.
+- **Cancellation during a model call.** Given a cancel while the model answers with tool calls, then no tool runs, no pending action is requested and the run ends `cancelled`.
+- **Calls after an approve call.** Given a step with an `approve` call followed by an `auto` call, then the `auto` call does not run and the model receives `TOOL_CALL_DEFERRED`.
+- **Blank answer.** Given a final answer with no text, then the run ends `failed` with `RUN_EMPTY_ANSWER` and is not retried.
 - **Approve policy.** Given a tool whose policy is `approve`, when the model calls it, then its handler does not execute, a pending action is requested and the run ends `awaiting_approval` (BR-02).
 - **Tier floor.** Given a policy that sets an `external` tool to `auto`, when the configuration is validated, then it is rejected with `TOOL_POLICY_INVALID` (BR-02, ADR-0011).
 - **Unclassified tool.** Given a task that lists a tool without a tier and policy, when the configuration is validated, then it is rejected with `TOOL_UNCLASSIFIED`; the tool is never offered to the model and never silently left out (ADR-0014).
@@ -163,7 +176,7 @@ All are proved by unit tests with `FakeLlmProvider`, an in-memory run store, a f
 - **Attempts.** Given a route with `maxAttempts` 3 and three retryable failures, then the third failure ends the call with its mapped code (D-9 rule 3).
 - **Cancel during a wait.** Given a cancel during a retry wait, then the wait ends at once and the run ends `cancelled` (D-9 rule 5).
 - **Invalid route.** Given a task that needs tools routed to a model without tool support, when the catalog is validated, then it is rejected with `LLM_ROUTE_INVALID` (BR-25).
-- **Adapter contract.** Given Anthropic fixtures hand-built from the provider's documented shapes (recorded fixtures replace them after the deferred recording, plan D-6), when the shared contract suite runs, then messages, tool calls, streaming events, usage and every mapped error code match, `retryAfterMs` comes from the rate-limit response, the SDK's retries are off, and no rejected field is sent (plan P-5).
+- **Adapter contract.** Given Anthropic fixtures hand-built from the provider's documented shapes (recorded fixtures replace them after the deferred recording, phase-1 plan, D-6), when the shared contract suite runs, then messages, tool calls, streaming events, usage and every mapped error code match, `retryAfterMs` comes from the rate-limit response, the SDK's retries are off, and no rejected field is sent (plan P-5).
 
 ## Owner decisions
 

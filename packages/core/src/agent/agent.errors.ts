@@ -1,9 +1,10 @@
-/** Every limit that ends a run (BR-21; features/agent.md, "Problem codes"). */
+/** Every problem the loop itself ends a run with (BR-21; features/agent.md, "Problem codes"). */
 export const AGENT_PROBLEMS = [
   "RUN_ITERATION_LIMIT",
   "RUN_BUDGET_EXCEEDED",
   "RUN_TOKEN_LIMIT",
   "RUN_TIME_LIMIT",
+  "RUN_EMPTY_ANSWER",
 ] as const;
 
 /** An agent problem code. */
@@ -15,4 +16,5 @@ export const AGENT_PROBLEM_MESSAGES: Record<AgentProblem, string> = {
   RUN_BUDGET_EXCEEDED: "The run reached its cost budget.",
   RUN_TOKEN_LIMIT: "The run reached its token limit.",
   RUN_TIME_LIMIT: "The run reached its running-time limit.",
+  RUN_EMPTY_ANSWER: "The model returned no answer.",
 };
