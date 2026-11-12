@@ -13,6 +13,7 @@ import {
   RATE_LIMITED_STREAM,
   REFUSAL_GENERATE,
   REFUSAL_STREAM,
+  STREAM_CUT_OFF_AFTER_TEXT,
   STREAM_ERROR_AFTER_TEXT,
   STREAM_ERROR_BEFORE_CONTENT,
 } from "./fixtures/synthetic/failure-fixtures";
@@ -194,6 +195,12 @@ const cases: readonly LlmContractCase[] = [
   },
   {
     fixture: STREAM_ERROR_AFTER_TEXT,
+    mode: "stream",
+    request: requests.countToFive,
+    expected: { outcome: "failed", problem: "LLM_UNAVAILABLE", emittedText: "one, two" },
+  },
+  {
+    fixture: STREAM_CUT_OFF_AFTER_TEXT,
     mode: "stream",
     request: requests.countToFive,
     expected: { outcome: "failed", problem: "LLM_UNAVAILABLE", emittedText: "one, two" },

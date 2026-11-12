@@ -31,13 +31,13 @@ export const LLM_PROBLEM_MESSAGES: Record<LlmProblem, string> = {
  * The problem each stop reason means, or none for a completed call. Adapters map a vendor's stop
  * reason to the neutral one, then throw the problem found here (plan D-8), so every adapter agrees.
  */
-export const STOP_REASON_PROBLEMS: Record<LlmStopReason, LlmProblem | undefined> = {
+export const STOP_REASON_PROBLEMS = {
   end_turn: undefined,
   tool_calls: undefined,
   max_output: "LLM_OUTPUT_TRUNCATED",
   refusal: "LLM_REFUSED",
   context_exceeded: "LLM_CONTEXT_EXCEEDED",
-};
+} as const satisfies Record<LlmStopReason, LlmProblem | undefined>;
 
 /**
  * Every reason code an `LlmError` can carry, for logs and the startup message (finding L17). A

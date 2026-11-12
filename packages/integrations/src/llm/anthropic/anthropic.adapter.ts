@@ -52,7 +52,6 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LlmP
   function requestOptions(request: LlmRequest) {
     const timeoutSignal = AbortSignal.timeout(request.timeoutMs);
     return {
-      maxRetries: SDK_MAX_RETRIES,
       timeout: request.timeoutMs,
       signal:
         request.signal === undefined

@@ -137,6 +137,25 @@ export const STREAM_ERROR_BEFORE_CONTENT = streamFixture(
   ],
 );
 
+/**
+ * A stream whose body ends after some text, with no error event and no `message_stop`: what a
+ * dropped connection looks like once the bytes stop. The SDK raises a plain `AnthropicError`,
+ * not an `APIError` (I1).
+ */
+export const STREAM_CUT_OFF_AFTER_TEXT = streamFixture(
+  "stream-cut-off-after-text",
+  streamed(COUNT_TO_FIVE_BODY),
+  [
+    ...messageStartEvents("msg_synthetic_stream_cut_off", 31),
+    {
+      type: "content_block_start",
+      index: 0,
+      content_block: { type: "text", text: "", citations: null },
+    },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "one, two" } },
+  ],
+);
+
 /** A stream that fails after some text arrived. */
 export const STREAM_ERROR_AFTER_TEXT = streamFixture(
   "stream-error-after-text",

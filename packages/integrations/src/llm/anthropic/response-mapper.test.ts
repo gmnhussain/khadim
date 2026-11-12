@@ -172,6 +172,28 @@ describe("mapResponse", () => {
     expect(error.problem).toBe("LLM_REQUEST_REJECTED");
     expect(error.reason).toBe("unexpected_content_block");
   });
+
+  it("keeps the call's usage on an unexpected content block, so its cost is recorded (I6, BR-23)", () => {
+    const serverToolUse: Anthropic.ServerToolUseBlock = {
+      type: "server_tool_use",
+      id: "srvtoolu_1",
+      name: "web_search",
+      input: {},
+      caller: { type: "direct" },
+    };
+    const usage = buildUsage({ input_tokens: 40, output_tokens: 9 });
+
+    const error = captureLlmError(() =>
+      mapResponse(buildMessage({ content: [serverToolUse], usage })),
+    );
+
+    expect(error.usage).toEqual({
+      inputTokens: 40,
+      outputTokens: 9,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+    });
+  });
 });
 
 describe("mapStreamEvent", () => {
@@ -196,6 +218,16 @@ describe("mapStreamEvent", () => {
         delta: { type: "text_delta", text: "" },
       }),
     ).toBeUndefined();
+  });
+
+  it("maps text that arrives in the start of a text block as a delta (I8)", () => {
+    expect(
+      mapStreamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: buildTextBlock("Hello"),
+      }),
+    ).toEqual({ type: "text_delta", text: "Hello" });
   });
 
   it("maps the start of a tool call with its id and name", () => {

@@ -67,7 +67,12 @@ function mapTool(tool: LlmToolDefinition): Anthropic.Tool {
 function mapAssistantPart(part: LlmAssistantPart): Anthropic.ContentBlockParam[] {
   switch (part.type) {
     case "text":
-      return [{ type: "text", text: part.text }];
+      // An empty text block fails the API's schema: `TextBlockParam` `text: string`,
+      // `minLength: 1` (platform.claude.com/docs/en/api/messages, read 2026-11-12). Unverified:
+      // that a whitespace-only block is rejected too, and that leaving a blank block out is not
+      // an edit of history for preserved thinking (KP-24). Checked against the live API in 1b's
+      // recording (I4).
+      return part.text.trim() === "" ? [] : [{ type: "text", text: part.text }];
     case "tool_call":
       return [{ type: "tool_use", id: part.toolCallId, name: part.toolName, input: part.input }];
     case "reasoning":
@@ -81,6 +86,20 @@ function mapAssistantPart(part: LlmAssistantPart): Anthropic.ContentBlockParam[]
       }
       return [part.payload];
   }
+}
+
+/**
+ * One message, or none for an assistant message with no content left. The turns around it stay
+ * valid: "Consecutive `user` or `assistant` turns in your request will be combined into a single
+ * turn" (platform.claude.com/docs/en/api/messages, `messages`, read 2026-11-12; review fixes,
+ * fix 4.4). But preserved thinking counts "delete any earlier `assistant` message" as an edit
+ * that invalidates the thinking blocks after it (build-with-claude/preserved-thinking, "What
+ * counts as an edit"), so a later thinking block may be refused. Whether the API accepts empty
+ * assistant content instead is not documented; checked live in 1b's recording (KP-24).
+ */
+function mapMessages(message: LlmMessage): Anthropic.MessageParam[] {
+  const mapped = mapMessage(message);
+  return Array.isArray(mapped.content) && mapped.content.length === 0 ? [] : [mapped];
 }
 
 function mapMessage(message: LlmMessage): Anthropic.MessageParam {
@@ -115,7 +134,7 @@ export function mapRequest(request: LlmRequest): Anthropic.MessageCreateParamsNo
   return {
     model: request.model,
     max_tokens: request.maxOutputTokens,
-    messages: request.messages.map(mapMessage),
+    messages: request.messages.flatMap(mapMessages),
     ...(request.system.length === 0 ? {} : { system: mapSystem(request.system) }),
     ...(request.tools.length === 0 ? {} : { tools: request.tools.map(mapTool) }),
     ...(request.effort === undefined ? {} : { output_config: { effort: request.effort } }),

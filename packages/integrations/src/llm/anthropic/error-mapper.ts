@@ -18,12 +18,27 @@ const PROBLEM_BY_ERROR_TYPE: Record<AnthropicErrorType, LlmProblem> = {
 
 const STATUS_RATE_LIMITED = 429;
 const STATUS_REQUEST_TIMEOUT = 408;
+/**
+ * "413 - `request_too_large`: Request exceeds the maximum allowed number of bytes" (128 MB for
+ * the Messages API). "On the first-party Claude API, Cloudflare returns this error before the
+ * request reaches the API servers", so its body may not carry the type: the status decides
+ * (platform.claude.com/docs/en/api/errors, read 2026-11-12). The owner's remedy is the same as
+ * for an oversized prompt, a smaller conversation (review fixes, fix 4.5).
+ */
+const STATUS_REQUEST_TOO_LARGE = 413;
+const REQUEST_TOO_LARGE_TYPE = "request_too_large";
 const STATUS_SERVER_ERROR_MIN = 500;
 const NOT_AUTHORIZED_STATUS_SET: ReadonlySet<number> = new Set([401, 402, 403]);
 
 /**
  * An oversized prompt is a 400 `invalid_request_error` with no code of its own, so its
- * documented message is the only signal that tells it from any other invalid request.
+ * documented message is the only signal that tells it from any other invalid request: "If the
+ * input alone already exceeds the model's context window, the API returns a 400
+ * `invalid_request_error` ("prompt is too long") on every model"
+ * (platform.claude.com/docs/en/build-with-claude/context-windows, read 2026-11-12; KP-20). Input
+ * plus `max_tokens` over the window is accepted on Claude 4.5 models and newer, and stops with
+ * `model_context_window_exceeded`, which the response mapper handles; the docs give no message
+ * text for the older models' error, so nothing else is matched.
  */
 const PROMPT_TOO_LONG_PATTERN = /prompt is too long/i;
 
@@ -61,8 +76,20 @@ function parsePositiveNumber(value: string | null | undefined): number | undefin
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+/** What `readRetryAfterMs` reads: any headers object with `get`, whatever made it (I10). */
+export interface HeaderReader {
+  readonly get: (name: string) => string | null;
+}
+
+/** Whether a value can be read like `Headers`, from any `fetch` an owner injects. */
+const isHeaderReader = (value: unknown): value is HeaderReader =>
+  typeof value === "object" &&
+  value !== null &&
+  "get" in value &&
+  typeof (value as { readonly get: unknown }).get === "function";
+
 /** The provider's retry delay: `retry-after-ms` in milliseconds, or `retry-after` in seconds. */
-export function readRetryAfterMs(headers: Headers | undefined): number | undefined {
+export function readRetryAfterMs(headers: HeaderReader | undefined): number | undefined {
   const milliseconds = parsePositiveNumber(headers?.get("retry-after-ms"));
   if (milliseconds !== undefined) {
     return Math.ceil(milliseconds);
@@ -81,7 +108,11 @@ export function mapError(error: unknown): LlmError | undefined {
     return error;
   }
   if (!(error instanceof Anthropic.APIError)) {
-    return undefined;
+    // Any other SDK error is a call that never reached a verdict: a body cut off mid-stream, a
+    // malformed event, a stream without a final message. Never a raw vendor error (I1, §12.1).
+    return error instanceof Anthropic.AnthropicError
+      ? new LlmError("LLM_UNAVAILABLE", { cause: error })
+      : undefined;
   }
   // An aborted or dropped call, or one that timed out, never reached a verdict: an outage.
   if (
@@ -93,6 +124,12 @@ export function mapError(error: unknown): LlmError | undefined {
   // The SDK types `status` and `headers` loosely, so both are checked before use.
   const status: unknown = error.status;
   const headers: unknown = error.headers;
+  // SDK 1.3.0 does not list `request_too_large` among its error types, so the type is read as
+  // a plain value.
+  const type: unknown = error.type;
+  if (status === STATUS_REQUEST_TOO_LARGE || type === REQUEST_TOO_LARGE_TYPE) {
+    return new LlmError("LLM_CONTEXT_EXCEEDED", { cause: error });
+  }
   const problem =
     problemOfType(error.type) ?? problemOfStatus(typeof status === "number" ? status : undefined);
   if (problem === "LLM_REQUEST_REJECTED" && PROMPT_TOO_LONG_PATTERN.test(error.message)) {
@@ -100,7 +137,7 @@ export function mapError(error: unknown): LlmError | undefined {
   }
   if (problem === "LLM_RATE_LIMITED") {
     return new LlmError(problem, {
-      retryAfterMs: readRetryAfterMs(headers instanceof Headers ? headers : undefined),
+      retryAfterMs: readRetryAfterMs(isHeaderReader(headers) ? headers : undefined),
       cause: error,
     });
   }

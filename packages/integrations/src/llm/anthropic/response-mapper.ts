@@ -41,7 +41,7 @@ function mapStopReason(stopReason: Anthropic.StopReason | null): LlmStopReason |
   }
 }
 
-function mapContentBlock(block: Anthropic.ContentBlock): LlmAssistantPart {
+function mapContentBlock(block: Anthropic.ContentBlock, usage: LlmUsage): LlmAssistantPart {
   if (block.type === "text") {
     return { type: "text", text: block.text };
   }
@@ -52,8 +52,9 @@ function mapContentBlock(block: Anthropic.ContentBlock): LlmAssistantPart {
     // Kept whole, empty text included: the signature is what the provider reads back.
     return { type: "reasoning", providerId: ANTHROPIC_PROVIDER_ID, payload: block };
   }
-  // Server-tool blocks: this adapter declares no server tools, so none should arrive.
-  throw new LlmError("LLM_REQUEST_REJECTED", { reason: "unexpected_content_block" });
+  // Server-tool blocks: this adapter declares no server tools, so none should arrive. The call
+  // still used tokens, so they go with the error and its cost is recorded (BR-23, I6).
+  throw new LlmError("LLM_REQUEST_REJECTED", { reason: "unexpected_content_block", usage });
 }
 
 function isCompleted(stopReason: LlmStopReason): stopReason is LlmCompletedStopReason {
@@ -71,9 +72,13 @@ export function mapResponse(message: Anthropic.Message): LlmResponse {
     throw new LlmError("LLM_REQUEST_REJECTED", { reason: "unexpected_stop_reason", usage });
   }
   if (!isCompleted(stopReason)) {
-    throw new LlmError(STOP_REASON_PROBLEMS[stopReason] ?? "LLM_REQUEST_REJECTED", { usage });
+    throw new LlmError(STOP_REASON_PROBLEMS[stopReason], { usage });
   }
-  return { content: message.content.map(mapContentBlock), stopReason, usage };
+  return {
+    content: message.content.map((block) => mapContentBlock(block, usage)),
+    stopReason,
+    usage,
+  };
 }
 
 /**
@@ -91,6 +96,11 @@ export function mapStreamEvent(event: Anthropic.RawMessageStreamEvent): LlmStrea
     }
     if (block.type === "tool_use") {
       return { type: "tool_call_started", toolCallId: block.id, toolName: block.name };
+    }
+    // A text block may start with text of its own; the final message holds it, so it is
+    // streamed too, or the owner would see less than is stored (I8).
+    if (block.type === "text" && block.text !== "") {
+      return { type: "text_delta", text: block.text };
     }
     return undefined;
   }

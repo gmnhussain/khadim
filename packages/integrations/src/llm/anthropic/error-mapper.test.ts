@@ -77,7 +77,6 @@ describe("mapError", () => {
   it.each([
     [400, "invalid_request_error"],
     [404, "not_found_error"],
-    [413, "request_too_large"],
     [409, "conflict_error"],
     [422, "invalid_request_error"],
   ])("maps a %i %s to LLM_REQUEST_REJECTED: a bug in Khadim", (status, type) => {
@@ -93,6 +92,47 @@ describe("mapError", () => {
     );
 
     expect(mapError(error)?.problem).toBe("LLM_CONTEXT_EXCEEDED");
+  });
+
+  it("maps a 413 request_too_large to LLM_CONTEXT_EXCEEDED (fix 4.5, KP-20)", () => {
+    expect(mapError(apiError(413, "request_too_large"))?.problem).toBe("LLM_CONTEXT_EXCEEDED");
+  });
+
+  it("maps a 413 by its status alone, as Cloudflare sends it before the API (fix 4.5)", () => {
+    const error = Anthropic.APIError.generate(
+      413,
+      undefined,
+      "Request Entity Too Large",
+      new Headers(),
+    );
+
+    expect(mapError(error)?.problem).toBe("LLM_CONTEXT_EXCEEDED");
+  });
+
+  it("reads retry-after from a headers object that is not the global Headers (I10)", () => {
+    const headers = { get: (name: string) => (name === "retry-after" ? "7" : null) };
+    const error = Anthropic.APIError.generate(
+      429,
+      errorBody("rate_limit_error", "Synthetic rate_limit_error."),
+      undefined,
+      headers as unknown as Headers,
+    );
+
+    expect(mapError(error)?.retryAfterMs).toBe(7_000);
+  });
+
+  it.each([
+    ["a stream cut off mid-body", new Anthropic.AnthropicError("terminated")],
+    [
+      "a stream without a final message",
+      new Anthropic.AnthropicError("stream ended without producing a Message"),
+    ],
+  ])("maps %s, a plain SDK error, to LLM_UNAVAILABLE (I1)", (_, error) => {
+    const mapped = mapError(error);
+
+    expect(mapped).toBeInstanceOf(LlmError);
+    expect(mapped?.problem).toBe("LLM_UNAVAILABLE");
+    expect(mapped?.cause).toBe(error);
   });
 
   it("maps an error in the middle of a stream by its type: it has no status", () => {

@@ -228,6 +228,38 @@ describe("mapRequest: history", () => {
     });
   });
 
+  it("never sends an empty or blank text block, which the API rejects (I4)", () => {
+    const messages: LlmMessage[] = [
+      { role: "user", content: [{ type: "text", text: "Time?" }] },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "" },
+          { type: "text", text: " \n" },
+          { type: "tool_call", toolCallId: "toolu_1", toolName: "get_current_time", input: {} },
+        ],
+      },
+    ];
+
+    expect(mapRequest(request({ messages })).messages[1]).toEqual({
+      role: "assistant",
+      content: [{ type: "tool_use", id: "toolu_1", name: "get_current_time", input: {} }],
+    });
+  });
+
+  it("leaves out an assistant message with nothing left: the API combines the user turns around it (fix 4.4)", () => {
+    const messages: LlmMessage[] = [
+      { role: "user", content: [{ type: "text", text: "Hi" }] },
+      { role: "assistant", content: [{ type: "text", text: "" }] },
+      { role: "user", content: [{ type: "text", text: "Hello?" }] },
+    ];
+
+    expect(mapRequest(request({ messages })).messages).toEqual([
+      { role: "user", content: [{ type: "text", text: "Hi" }] },
+      { role: "user", content: [{ type: "text", text: "Hello?" }] },
+    ]);
+  });
+
   it("sends every tool result of a step in one user message, errors flagged", () => {
     const messages: LlmMessage[] = [
       {
