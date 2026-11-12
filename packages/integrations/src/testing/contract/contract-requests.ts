@@ -52,9 +52,9 @@ export const CONTRACT_TOOL_OUTPUT = JSON.stringify({
   localTime: "00:00:00",
 });
 
-function userMessage(text: string): LlmMessage {
+const userMessage = (text: string): LlmMessage => {
   return { role: "user", content: [{ type: "text", text }] };
-}
+};
 
 /** The contract requests for one model. */
 export function createContractRequests(model: string) {

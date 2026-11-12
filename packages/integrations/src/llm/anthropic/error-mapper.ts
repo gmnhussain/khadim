@@ -48,13 +48,13 @@ const MS_PER_SECOND = 1000;
  * The API may return an error type newer than the SDK lists, such as `request_too_large`, so
  * the lookup is checked at runtime; an unknown type falls back to the HTTP status.
  */
-function problemOfType(type: string | null): LlmProblem | undefined {
+const problemOfType = (type: string | null): LlmProblem | undefined => {
   return type !== null && Object.hasOwn(PROBLEM_BY_ERROR_TYPE, type)
     ? PROBLEM_BY_ERROR_TYPE[type as AnthropicErrorType]
     : undefined;
-}
+};
 
-function problemOfStatus(status: number | undefined): LlmProblem {
+const problemOfStatus = (status: number | undefined): LlmProblem => {
   if (status === STATUS_RATE_LIMITED) {
     return "LLM_RATE_LIMITED";
   }
@@ -66,15 +66,15 @@ function problemOfStatus(status: number | undefined): LlmProblem {
     return "LLM_UNAVAILABLE";
   }
   return NOT_AUTHORIZED_STATUS_SET.has(status) ? "LLM_NOT_AUTHORIZED" : "LLM_REQUEST_REJECTED";
-}
+};
 
-function parsePositiveNumber(value: string | null | undefined): number | undefined {
+const parsePositiveNumber = (value: string | null | undefined): number | undefined => {
   if (value === null || value === undefined) {
     return undefined;
   }
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
+};
 
 /** What `readRetryAfterMs` reads: any headers object with `get`, whatever made it (I10). */
 export interface HeaderReader {

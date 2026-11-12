@@ -14,8 +14,9 @@ const IS_RETRYABLE: Record<LlmProblem, boolean> = {
 };
 
 /**
- * Plan D-9 rule 2: only text and tool-call content counts as emitted. Stream start and
- * reasoning do not, and `completed` ends a call that has nothing left to retry.
+ * Plan D-9 rule 2: only text and tool-call content counts as emitted; stream start and reasoning
+ * do not. `completed` is not content either: once it arrives the loop keeps the response, and
+ * an error after it is never retried (review fixes, fix 1.4).
  */
 const EMITS_CONTENT: Record<LlmStreamEvent["type"], boolean> = {
   started: false,
@@ -59,13 +60,22 @@ export type RetryDecision =
   | { readonly retry: true; readonly delayMs: number }
   | { readonly retry: false; readonly refusal: RetryRefusal };
 
-/** Whether a stream event is content the owner can already see (D-9 rule 2). */
+/**
+ * Whether a stream event is content the owner can already see (D-9 rule 2). An empty text
+ * delta shows nothing, so it does not count (finding L9).
+ */
 export function isEmittedContent(event: LlmStreamEvent): boolean {
-  return EMITS_CONTENT[event.type];
+  return event.type === "text_delta" ? event.text !== "" : EMITS_CONTENT[event.type];
 }
 
-/** Exponential backoff with equal jitter, in whole milliseconds. */
+/**
+ * Exponential backoff with equal jitter, in whole milliseconds. A random value outside [0, 1)
+ * means the injected source breaks its contract: a bug, so it throws (conventions §7, L7).
+ */
 export function computeBackoffMs(attemptsMade: number, randomValue: number): number {
+  if (!(randomValue >= 0 && randomValue < 1)) {
+    throw new Error(`random value is not in [0, 1): ${randomValue}`);
+  }
   const ceilingMs = Math.min(
     BACKOFF_MAX_MS,
     BACKOFF_BASE_MS * BACKOFF_FACTOR ** (attemptsMade - 1),
@@ -86,7 +96,15 @@ export function decideRetry(input: RetryInput): RetryDecision {
     return { retry: false, refusal: "attempts_exhausted" };
   }
   const backoffMs = computeBackoffMs(input.attemptsMade, input.randomValue);
-  const delayMs = Math.max(backoffMs, input.retryAfterMs ?? 0);
+  // A provider delay that is not a finite, non-negative number is ignored: the backoff stands
+  // (finding L7).
+  const retryAfterMs =
+    input.retryAfterMs !== undefined &&
+    Number.isFinite(input.retryAfterMs) &&
+    input.retryAfterMs >= 0
+      ? input.retryAfterMs
+      : 0;
+  const delayMs = Math.max(backoffMs, retryAfterMs);
   // A wait that ends exactly when the running time does leaves no time for the call itself.
   if (delayMs >= input.remainingRunMs) {
     return { retry: false, refusal: "exceeds_time_budget" };

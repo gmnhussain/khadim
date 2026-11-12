@@ -38,7 +38,7 @@ const DEFAULT_CAPABILITIES: LlmCapabilities = {
 };
 
 /** The events a real stream would report for a completed response. */
-function eventsOf(response: LlmResponse): LlmStreamEvent[] {
+const eventsOf = (response: LlmResponse): LlmStreamEvent[] => {
   const events: LlmStreamEvent[] = [{ type: "started" }];
   for (const part of response.content) {
     switch (part.type) {
@@ -59,12 +59,12 @@ function eventsOf(response: LlmResponse): LlmStreamEvent[] {
   }
   events.push({ type: "completed", response });
   return events;
-}
+};
 
-function iterate(
+const iterate = (
   events: readonly LlmStreamEvent[],
   failure: LlmError | undefined,
-): AsyncIterable<LlmStreamEvent> {
+): AsyncIterable<LlmStreamEvent> => {
   return {
     [Symbol.asyncIterator]() {
       let index = 0;
@@ -82,7 +82,7 @@ function iterate(
       };
     },
   };
-}
+};
 
 /** Creates a provider that replays a script, so the loop is tested without a model (ADR-0005). */
 export function createFakeLlmProvider(options: FakeLlmProviderOptions): FakeLlmProvider {
@@ -107,10 +107,19 @@ export function createFakeLlmProvider(options: FakeLlmProviderOptions): FakeLlmP
       return step.kind === "response" ? Promise.resolve(step.response) : Promise.reject(step.error);
     },
     stream(request) {
-      const step = takeStep(request);
-      return step.kind === "response"
-        ? iterate(eventsOf(step.response), undefined)
-        : iterate(step.eventsBeforeFailure ?? [], step.error);
+      // Like a real adapter's stream, it does nothing until it is read: the step is taken, and
+      // the request recorded, when iteration begins, and a scripted failure arrives while
+      // reading (L16).
+      return {
+        [Symbol.asyncIterator]() {
+          const step = takeStep(request);
+          const events =
+            step.kind === "response"
+              ? iterate(eventsOf(step.response), undefined)
+              : iterate(step.eventsBeforeFailure ?? [], step.error);
+          return events[Symbol.asyncIterator]();
+        },
+      };
     },
   };
 

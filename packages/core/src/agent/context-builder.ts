@@ -40,14 +40,14 @@ export function wrapUntrustedContent(source: string, text: string): string {
   return `<${UNTRUSTED_TAG} source="${source}">\n${defused}\n</${UNTRUSTED_TAG}>`;
 }
 
-function toTextPart(part: RunInputPart): LlmTextPart {
+const toTextPart = (part: RunInputPart): LlmTextPart => {
   switch (part.kind) {
     case "owner_text":
       return { type: "text", text: part.text };
     case "untrusted":
       return { type: "text", text: wrapUntrustedContent(part.source, part.text) };
   }
-}
+};
 
 /**
  * Builds the context a run starts from, stable prefix first so adapters can cache it: the

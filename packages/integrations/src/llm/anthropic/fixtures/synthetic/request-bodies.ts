@@ -23,13 +23,13 @@ const CACHEABLE_SYSTEM_TEXT = [
 ].join("\n");
 
 /** The cache marker sits on the last stable system block. */
-function systemBlocks(text: string): Anthropic.TextBlockParam[] {
+const systemBlocks = (text: string): Anthropic.TextBlockParam[] => {
   return [{ type: "text", text, cache_control: { type: "ephemeral" } }];
-}
+};
 
-function userText(text: string): Anthropic.MessageParam {
+const userText = (text: string): Anthropic.MessageParam => {
   return { role: "user", content: [{ type: "text", text }] };
-}
+};
 
 const TIME_TOOL: Anthropic.Tool = {
   name: "get_current_time",
@@ -45,10 +45,10 @@ const TIME_TOOL: Anthropic.Tool = {
   strict: true,
 };
 
-function body(
+const body = (
   messages: Anthropic.MessageParam[],
   overrides: Partial<Anthropic.MessageCreateParamsNonStreaming> = {},
-): Anthropic.MessageCreateParamsNonStreaming {
+): Anthropic.MessageCreateParamsNonStreaming => {
   return {
     model: SYNTHETIC_MODEL,
     max_tokens: MAX_TOKENS,
@@ -57,7 +57,7 @@ function body(
     output_config: { effort: "low" },
     ...overrides,
   };
-}
+};
 
 /** The same request, streamed. */
 export function streamed(

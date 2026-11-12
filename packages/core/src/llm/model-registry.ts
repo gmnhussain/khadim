@@ -93,9 +93,9 @@ export type ModelRouteResolution =
       readonly reason: Extract<LlmErrorReason, "no_route">;
     };
 
-function modelKey(provider: string, id: string): string {
+const modelKey = (provider: string, id: string): string => {
   return JSON.stringify([provider, id]);
-}
+};
 
 /**
  * Creates the model registry: it validates the catalog and every task route once, then resolves

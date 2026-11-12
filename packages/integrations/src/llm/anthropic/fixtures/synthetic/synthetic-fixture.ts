@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
 import type { LlmHttpFixture } from "../../../../testing/contract/llm-contract.types";
-import { buildUsage } from "../../testing/anthropic-shapes";
+import { buildMessage, buildUsage, sseEvent } from "../../testing/anthropic-shapes";
 
 /**
  * Builders of the hand-built fixtures. Every request body, message, stream event and error is
@@ -35,17 +35,8 @@ export function buildSyntheticMessage(
   fields: Pick<Anthropic.Message, "content" | "stop_reason" | "usage"> &
     Partial<Pick<Anthropic.Message, "stop_details">>,
 ): Anthropic.Message {
-  return {
-    id,
-    container: null,
-    diagnostics: null,
-    model: SYNTHETIC_MODEL,
-    role: "assistant",
-    stop_details: null,
-    stop_sequence: null,
-    type: "message",
-    ...fields,
-  };
+  // The Message skeleton lives in one place, the shape helpers (finding I12).
+  return buildMessage({ id, model: SYNTHETIC_MODEL, ...fields });
 }
 
 /** The exchange of a call that is not streamed: a JSON message with status 200. */
@@ -75,9 +66,9 @@ export function streamFixture(
     response: {
       status: 200,
       headers: STREAM_HEADERS,
-      body: events
-        .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
-        .join(""),
+      // One SSE framing for fixtures and mapping tests alike (finding I12). The spread gives the
+      // SDK's event interfaces the index signature `sseEvent` takes.
+      body: events.map((event) => sseEvent({ ...event })).join(""),
     },
   };
 }

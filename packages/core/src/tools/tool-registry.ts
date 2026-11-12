@@ -1,5 +1,10 @@
 import { TOOL_PROBLEM_MESSAGES, type ToolCallProblem, ToolRefusedError } from "./tool.errors";
-import { checkCallLimits, findToolConfigProblem, pausesRun } from "./tool-policy.rules";
+import {
+  checkCallLimits,
+  type ClassifiedTool,
+  classifyToolConfig,
+  pausesRun,
+} from "./tool-policy.rules";
 import {
   type CountToolCallsToday,
   type OfferedTool,
@@ -9,7 +14,6 @@ import {
   type ToolOutput,
   type ToolPolicy,
   toolPolicyConfigSchema,
-  type ToolPolicyEntry,
 } from "./tool.types";
 
 /** Dependencies of `createToolRegistry`. */
@@ -60,15 +64,10 @@ export type ToolCallResolution =
 /** Result of `executeToolCall`: the output as JSON text, ready for the model. */
 export type ToolCallExecution = { readonly ok: true; readonly value: string } | ToolCallRefusal;
 
-interface ClassifiedTool {
-  readonly tool: ToolDefinition;
-  readonly entry: ToolPolicyEntry;
-}
-
 /** A requested call that is offered to the task and has valid input, before its limits. */
 interface PreparedToolCall {
   readonly ok: true;
-  readonly classified: ClassifiedTool;
+  readonly classified: ClassifiedTool<ToolDefinition>;
   readonly input: unknown;
   readonly execute: () => Promise<ToolOutput>;
 }
@@ -82,20 +81,20 @@ const MAX_REPORTED_ISSUES = 5;
  */
 export const MAX_TOOL_OUTPUT_CHARS = 16_000;
 
-function refuse(problem: ToolCallProblem, detail?: string): ToolCallRefusal {
+const refuse = (problem: ToolCallProblem, detail?: string): ToolCallRefusal => {
   const message = TOOL_PROBLEM_MESSAGES[problem];
   return { ok: false, problem, message: detail === undefined ? message : `${message} ${detail}` };
-}
+};
 
 /** The first issues, and how many more were left out, so the model can fix them in one go. */
-function describeIssues(issues: readonly ToolInputIssue[]): string {
+const describeIssues = (issues: readonly ToolInputIssue[]): string => {
   const reported = issues
     .slice(0, MAX_REPORTED_ISSUES)
     .map((issue) => `${issue.path}: ${issue.message}`)
     .join("; ");
   const leftOut = issues.length - MAX_REPORTED_ISSUES;
   return leftOut > 0 ? `${reported}; and ${leftOut} more` : reported;
-}
+};
 
 /**
  * Creates the tool registry: it validates the tool configuration once, offers each task only
@@ -117,30 +116,11 @@ export function createToolRegistry(dependencies: ToolRegistryDependencies) {
   if (!parsedConfig.success) {
     throw new ToolRefusedError("TOOL_POLICY_INVALID", { cause: parsedConfig.error });
   }
-  const config = parsedConfig.data;
-  const effectByToolName = new Map<string, ToolEffect>(
-    dependencies.tools.map((tool) => [tool.name, tool.effect]),
-  );
-  const finding = findToolConfigProblem(config, effectByToolName);
-  if (finding !== undefined) {
-    throw new ToolRefusedError(finding.problem, { toolName: finding.toolName });
+  const classification = classifyToolConfig(parsedConfig.data, toolByName);
+  if (!classification.ok) {
+    throw new ToolRefusedError(classification.problem, { toolName: classification.toolName });
   }
-
-  // Maps, not objects: tool and task names come from the model and the config file (KP-08).
-  const entryByToolName = new Map(Object.entries(config.policies));
-  const classifiedByTask = new Map<string, ReadonlyMap<string, ClassifiedTool>>();
-  for (const [task, toolNames] of Object.entries(config.tasks)) {
-    const classifiedByName = new Map<string, ClassifiedTool>();
-    for (const toolName of toolNames) {
-      const tool = toolByName.get(toolName);
-      const entry = entryByToolName.get(toolName);
-      if (tool === undefined || entry === undefined) {
-        throw new Error(`validated tool configuration lost a tool: ${toolName}`);
-      }
-      classifiedByName.set(toolName, { tool, entry });
-    }
-    classifiedByTask.set(task, classifiedByName);
-  }
+  const classifiedByTask = classification.value;
 
   // The handler of a resolved call stays here, so nothing outside the registry can run it.
   const executeByResolvedCall = new WeakMap<ResolvedToolCall, () => Promise<ToolOutput>>();

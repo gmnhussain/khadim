@@ -57,29 +57,50 @@ export function checkCallLimits(
   return undefined;
 }
 
+/** A tool and the owner's policy for it: what a task may call (ADR-0011). */
+export interface ClassifiedTool<TTool> {
+  readonly tool: TTool;
+  readonly entry: ToolPolicyEntry;
+}
+
+/** Result of `classifyToolConfig`: each task's tools by name, or the first problem found. */
+export type ToolConfigClassification<TTool> =
+  | {
+      readonly ok: true;
+      readonly value: ReadonlyMap<string, ReadonlyMap<string, ClassifiedTool<TTool>>>;
+    }
+  | ({ readonly ok: false } & ToolConfigFinding);
+
 /**
- * Finds the first problem in the tool configuration, or none. Every policy must respect its
+ * Checks the tool configuration and classifies it in one pass. Every policy must respect its
  * tool's tier, and every tool a task lists must exist and have a policy: a tool is never
- * silently left out (ADR-0014, fail closed).
+ * silently left out (ADR-0014, fail closed). Maps, not objects: tool and task names come from
+ * the model and the config file (KP-08; finding #14).
  */
-export function findToolConfigProblem(
+export function classifyToolConfig<TTool extends { readonly effect: ToolEffect }>(
   config: ToolPolicyConfig,
-  effectByToolName: ReadonlyMap<string, ToolEffect>,
-): ToolConfigFinding | undefined {
+  toolByName: ReadonlyMap<string, TTool>,
+): ToolConfigClassification<TTool> {
   for (const [toolName, entry] of Object.entries(config.policies)) {
-    const problem = checkPolicyAllowed(effectByToolName.get(toolName), entry.policy);
+    const problem = checkPolicyAllowed(toolByName.get(toolName)?.effect, entry.policy);
     if (problem !== undefined) {
-      return { problem, toolName };
+      return { ok: false, problem, toolName };
     }
   }
-  for (const toolNames of Object.values(config.tasks)) {
+  const classifiedByTask = new Map<string, ReadonlyMap<string, ClassifiedTool<TTool>>>();
+  for (const [task, toolNames] of Object.entries(config.tasks)) {
+    const classifiedByName = new Map<string, ClassifiedTool<TTool>>();
     for (const toolName of toolNames) {
-      const isClassified =
-        effectByToolName.has(toolName) && Object.hasOwn(config.policies, toolName);
-      if (!isClassified) {
-        return { problem: "TOOL_UNCLASSIFIED", toolName };
+      const tool = toolByName.get(toolName);
+      const entry = Object.hasOwn(config.policies, toolName)
+        ? config.policies[toolName]
+        : undefined;
+      if (tool === undefined || entry === undefined) {
+        return { ok: false, problem: "TOOL_UNCLASSIFIED", toolName };
       }
+      classifiedByName.set(toolName, { tool, entry });
     }
+    classifiedByTask.set(task, classifiedByName);
   }
-  return undefined;
+  return { ok: true, value: classifiedByTask };
 }

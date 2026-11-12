@@ -1,4 +1,5 @@
 import {
+  countPromptTokens,
   findMissingCapability,
   type LlmCapabilities,
   type LlmErrorReason,
@@ -27,7 +28,7 @@ export const ZERO_RUN_TOTALS: RunTotals = {
 
 /** Every token of a call: fresh and cached input, and output. */
 export function countCallTokens(usage: LlmUsage): number {
-  return usage.inputTokens + usage.cacheWriteTokens + usage.cacheReadTokens + usage.outputTokens;
+  return countPromptTokens(usage) + usage.outputTokens;
 }
 
 /** Adds the tokens and cost of one model call attempt, failed attempts included (BR-23). */

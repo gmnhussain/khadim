@@ -11,12 +11,12 @@ import type { LlmHttpFixture } from "../../../testing/contract/llm-contract.type
  */
 const UNSENT_REQUEST_FIELDS = ["temperature", "top_p", "top_k", "tool_choice", "thinking"];
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
-}
+};
 
 /** The JSON objects of a response: one message, or the data of each server-sent event. */
-function readResponseObjects(fixture: LlmHttpFixture): unknown[] {
+const readResponseObjects = (fixture: LlmHttpFixture): unknown[] => {
   const { headers, body } = fixture.response;
   if (!(headers["content-type"] ?? "").startsWith("text/event-stream")) {
     return [JSON.parse(body) as unknown];
@@ -25,14 +25,14 @@ function readResponseObjects(fixture: LlmHttpFixture): unknown[] {
     .split("\n")
     .filter((line) => line.startsWith("data:"))
     .map((line) => JSON.parse(line.slice("data:".length)) as unknown);
-}
+};
 
-function readStrings(values: readonly unknown[]): string[] {
+const readStrings = (values: readonly unknown[]): string[] => {
   return values.filter((value): value is string => typeof value === "string" && value !== "");
-}
+};
 
 /** The signature of a thinking block, or the data of a redacted one. */
-function readBlockValues(block: unknown): string[] {
+const readBlockValues = (block: unknown): string[] => {
   if (!isRecord(block)) {
     return [];
   }
@@ -40,7 +40,7 @@ function readBlockValues(block: unknown): string[] {
     return readStrings([block.signature]);
   }
   return block.type === "redacted_thinking" ? readStrings([block.data]) : [];
-}
+};
 
 /**
  * The opaque reasoning values in a fixture's response: signatures and redacted data, from a

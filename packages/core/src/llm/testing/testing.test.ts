@@ -156,10 +156,33 @@ describe("createFakeLlmProvider", () => {
     expect(events).toContainEqual({ type: "text_delta", text: "two" });
   });
 
-  it("refuses a call the script has no step for, and still records the request", () => {
+  it("refuses a call the script has no step for, and still records the request", async () => {
     const fake = createFakeLlmProvider({ steps: [] });
 
-    expect(() => fake.provider.stream(REQUEST)).toThrow("fake LLM provider has no step for call 1");
+    const { failure } = await collect(fake.provider.stream(REQUEST));
+
+    expect(failure).toEqual(new Error("fake LLM provider has no step for call 1"));
     expect(fake.requests).toHaveLength(1);
+  });
+
+  it("does nothing until a stream is read, like a real adapter (L16)", async () => {
+    const fake = createFakeLlmProvider({
+      steps: [{ kind: "response", response: createTextResponse("one") }],
+    });
+
+    const unread = fake.provider.stream(REQUEST);
+    expect(fake.requests).toEqual([]);
+
+    const { events } = await collect(unread);
+    expect(fake.requests).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({ type: "completed" });
+  });
+
+  it("fails a scripted stream while it is read, not when it is created", () => {
+    const fake = createFakeLlmProvider({
+      steps: [{ kind: "failure", error: new LlmError("LLM_UNAVAILABLE") }],
+    });
+
+    expect(() => fake.provider.stream(REQUEST)).not.toThrow();
   });
 });

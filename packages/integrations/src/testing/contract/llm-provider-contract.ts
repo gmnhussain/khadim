@@ -27,11 +27,11 @@ interface CallResult {
   readonly failure: unknown;
 }
 
-async function callProvider(
+const callProvider = async (
   provider: LlmProvider,
   mode: LlmContractMode,
   request: LlmRequest,
-): Promise<CallResult> {
+): Promise<CallResult> => {
   const events: LlmStreamEvent[] = [];
   try {
     if (mode === "generate") {
@@ -48,23 +48,23 @@ async function callProvider(
   } catch (error) {
     return { events, response: undefined, failure: error };
   }
-}
+};
 
-function textOf(response: LlmResponse): string {
+const textOf = (response: LlmResponse): string => {
   return response.content.map((part) => (part.type === "text" ? part.text : "")).join("");
-}
+};
 
-function toolCallsOf(response: LlmResponse) {
+const toolCallsOf = (response: LlmResponse) => {
   return response.content.flatMap((part) =>
     part.type === "tool_call" ? [{ toolName: part.toolName, input: part.input }] : [],
   );
-}
+};
 
-function deltaTextOf(events: readonly LlmStreamEvent[]): string {
+const deltaTextOf = (events: readonly LlmStreamEvent[]): string => {
   return events.map((event) => (event.type === "text_delta" ? event.text : "")).join("");
-}
+};
 
-function expectValidUsage(usage: LlmUsage): void {
+const expectValidUsage = (usage: LlmUsage): void => {
   const counts = [
     usage.inputTokens,
     usage.outputTokens,
@@ -74,9 +74,9 @@ function expectValidUsage(usage: LlmUsage): void {
   expect(counts.every((count) => Number.isInteger(count) && count >= 0)).toBe(true);
   expect(usage.inputTokens + usage.cacheWriteTokens + usage.cacheReadTokens).toBeGreaterThan(0);
   expect(usage.outputTokens).toBeGreaterThan(0);
-}
+};
 
-function expectCompletion(result: CallResult, expected: ExpectedCompletion): LlmResponse {
+const expectCompletion = (result: CallResult, expected: ExpectedCompletion): LlmResponse => {
   expect(result.failure).toBeUndefined();
   const response = result.response;
   if (response === undefined) {
@@ -100,9 +100,9 @@ function expectCompletion(result: CallResult, expected: ExpectedCompletion): Llm
     expect(response.usage.cacheReadTokens).toBeGreaterThan(0);
   }
   return response;
-}
+};
 
-function expectFailure(result: CallResult, expected: ExpectedFailure): void {
+const expectFailure = (result: CallResult, expected: ExpectedFailure): void => {
   expect(result.response).toBeUndefined();
   expect(result.failure).toBeInstanceOf(LlmError);
   expect(result.failure).toMatchObject({ problem: expected.problem });
@@ -110,10 +110,10 @@ function expectFailure(result: CallResult, expected: ExpectedFailure): void {
   if (expected.usage !== undefined) {
     expect(result.failure).toHaveProperty("usage", expected.usage);
   }
-}
+};
 
 /** A completed stream starts, reports its content in order and ends with the whole response. */
-function expectOrderedStream(result: CallResult, response: LlmResponse): void {
+const expectOrderedStream = (result: CallResult, response: LlmResponse): void => {
   const { events } = result;
   expect(events[0]).toEqual({ type: "started" });
   expect(events.at(-1)).toEqual({ type: "completed", response });
@@ -130,7 +130,7 @@ function expectOrderedStream(result: CallResult, response: LlmResponse): void {
       part.type === "tool_call" ? [{ toolCallId: part.toolCallId, toolName: part.toolName }] : [],
     ),
   );
-}
+};
 
 /**
  * The contract every `LlmProvider` adapter keeps (ADR-0009), run over HTTP fixtures with MSW

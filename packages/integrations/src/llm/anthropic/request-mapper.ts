@@ -18,9 +18,9 @@ type ReasoningBlock = Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingB
 
 const CACHE_MARKER: Anthropic.CacheControlEphemeral = { type: "ephemeral" };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
-}
+};
 
 /** Whether a reasoning payload is a block this adapter produced. */
 export function isReasoningBlock(payload: unknown): payload is ReasoningBlock {
@@ -38,7 +38,7 @@ export function isReasoningBlock(payload: unknown): payload is ReasoningBlock {
  * prefix, which also caches the tool definitions rendered before it (conventions §15.2).
  * Moving or adding a cache marker never invalidates a reasoning block.
  */
-function mapSystem(system: readonly LlmSystemPart[]): Anthropic.TextBlockParam[] {
+const mapSystem = (system: readonly LlmSystemPart[]): Anthropic.TextBlockParam[] => {
   const firstVolatileIndex = system.findIndex((part) => !part.isStable);
   const lastStableIndex = (firstVolatileIndex === -1 ? system.length : firstVolatileIndex) - 1;
   return system.map((part, index) => ({
@@ -46,7 +46,7 @@ function mapSystem(system: readonly LlmSystemPart[]): Anthropic.TextBlockParam[]
     text: part.text,
     ...(index === lastStableIndex ? { cache_control: CACHE_MARKER } : {}),
   }));
-}
+};
 
 /**
  * A strict tool (phase-1 plan, D-3). Strict schemas reject keywords such as `maxLength` and
@@ -54,7 +54,7 @@ function mapSystem(system: readonly LlmSystemPart[]): Anthropic.TextBlockParam[]
  * keeps `enum` and `const`; core's tool registry still enforces every keyword with Zod before a
  * handler runs (review fixes, D-8).
  */
-function mapTool(tool: LlmToolDefinition): Anthropic.Tool {
+const mapTool = (tool: LlmToolDefinition): Anthropic.Tool => {
   const { $schema: _dialect, ...schema } = tool.inputJsonSchema;
   return {
     name: tool.name,
@@ -62,9 +62,9 @@ function mapTool(tool: LlmToolDefinition): Anthropic.Tool {
     input_schema: { ...toStrictInputSchema(schema), type: "object" },
     strict: true,
   };
-}
+};
 
-function mapAssistantPart(part: LlmAssistantPart): Anthropic.ContentBlockParam[] {
+const mapAssistantPart = (part: LlmAssistantPart): Anthropic.ContentBlockParam[] => {
   switch (part.type) {
     case "text":
       // An empty text block fails the API's schema: `TextBlockParam` `text: string`,
@@ -86,7 +86,7 @@ function mapAssistantPart(part: LlmAssistantPart): Anthropic.ContentBlockParam[]
       }
       return [part.payload];
   }
-}
+};
 
 /**
  * One message, or none for an assistant message with no content left. The turns around it stay
@@ -97,12 +97,12 @@ function mapAssistantPart(part: LlmAssistantPart): Anthropic.ContentBlockParam[]
  * counts as an edit"), so a later thinking block may be refused. Whether the API accepts empty
  * assistant content instead is not documented; checked live in 1b's recording (KP-24).
  */
-function mapMessages(message: LlmMessage): Anthropic.MessageParam[] {
+const mapMessages = (message: LlmMessage): Anthropic.MessageParam[] => {
   const mapped = mapMessage(message);
   return Array.isArray(mapped.content) && mapped.content.length === 0 ? [] : [mapped];
-}
+};
 
-function mapMessage(message: LlmMessage): Anthropic.MessageParam {
+const mapMessage = (message: LlmMessage): Anthropic.MessageParam => {
   switch (message.role) {
     case "user":
       return {
@@ -123,7 +123,7 @@ function mapMessage(message: LlmMessage): Anthropic.MessageParam {
         })),
       };
   }
-}
+};
 
 /**
  * Maps a provider-neutral request to the Messages API. It never sends `temperature`, `top_p`,

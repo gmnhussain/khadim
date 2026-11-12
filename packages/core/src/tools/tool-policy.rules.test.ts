@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkCallLimits,
   checkPolicyAllowed,
-  findToolConfigProblem,
+  classifyToolConfig,
   pausesRun,
 } from "./tool-policy.rules";
 import type { ToolEffect, ToolPolicyConfig } from "./tool.types";
@@ -111,8 +111,10 @@ describe("checkCallLimits", () => {
   });
 });
 
-describe("findToolConfigProblem", () => {
-  const EFFECTS: ReadonlyMap<string, ToolEffect> = new Map([
+describe("classifyToolConfig (#14)", () => {
+  const toolsOf = (entries: readonly (readonly [string, ToolEffect])[]) =>
+    new Map(entries.map(([name, effect]) => [name, { effect }]));
+  const EFFECTS = toolsOf([
     ["get_current_time", "read"],
     ["remember_fact", "local_write"],
     ["publish_post", "external"],
@@ -130,16 +132,37 @@ describe("findToolConfigProblem", () => {
     },
   };
 
-  it("finds nothing in a valid configuration", () => {
-    expect(findToolConfigProblem(VALID_CONFIG, EFFECTS)).toBeUndefined();
+  it("classifies a valid configuration: each task's tools with their policies, in order", () => {
+    const classification = classifyToolConfig(VALID_CONFIG, EFFECTS);
+    if (!classification.ok) {
+      throw new Error("expected a valid configuration");
+    }
+
+    const chat = classification.value.get("chat");
+    expect([...(chat?.keys() ?? [])]).toEqual([
+      "get_current_time",
+      "remember_fact",
+      "publish_post",
+    ]);
+    expect(chat?.get("remember_fact")).toEqual({
+      tool: { effect: "local_write" },
+      entry: { policy: "propose" },
+    });
+    expect([...(classification.value.get("draft_post")?.keys() ?? [])]).toEqual(["publish_post"]);
   });
 
   it("finds nothing in an empty configuration", () => {
-    expect(findToolConfigProblem({ policies: {}, tasks: {} }, new Map())).toBeUndefined();
+    expect(classifyToolConfig({ policies: {}, tasks: {} }, new Map())).toEqual({
+      ok: true,
+      value: new Map(),
+    });
   });
 
   it("accepts a task with no tools", () => {
-    expect(findToolConfigProblem({ policies: {}, tasks: { chat: [] } }, EFFECTS)).toBeUndefined();
+    expect(classifyToolConfig({ policies: {}, tasks: { chat: [] } }, EFFECTS)).toEqual({
+      ok: true,
+      value: new Map([["chat", new Map()]]),
+    });
   });
 
   it("reports an external tool set to auto (BR-02, ADR-0011)", () => {
@@ -148,7 +171,8 @@ describe("findToolConfigProblem", () => {
       tasks: {},
     };
 
-    expect(findToolConfigProblem(config, EFFECTS)).toEqual({
+    expect(classifyToolConfig(config, EFFECTS)).toEqual({
+      ok: false,
       problem: "TOOL_POLICY_INVALID",
       toolName: "publish_post",
     });
@@ -161,11 +185,12 @@ describe("findToolConfigProblem", () => {
       tasks: {},
     };
 
-    expect(findToolConfigProblem(auto, EFFECTS)).toEqual({
+    expect(classifyToolConfig(auto, EFFECTS)).toEqual({
+      ok: false,
       problem: "TOOL_POLICY_INVALID",
       toolName: "send_email",
     });
-    expect(findToolConfigProblem(approve, EFFECTS)).toBeUndefined();
+    expect(classifyToolConfig(approve, EFFECTS).ok).toBe(true);
   });
 
   it("reports a task that lists a tool with no policy entry: never silently left out (ADR-0014)", () => {
@@ -174,7 +199,8 @@ describe("findToolConfigProblem", () => {
       tasks: { chat: ["get_current_time", "remember_fact"] },
     };
 
-    expect(findToolConfigProblem(config, EFFECTS)).toEqual({
+    expect(classifyToolConfig(config, EFFECTS)).toEqual({
+      ok: false,
       problem: "TOOL_UNCLASSIFIED",
       toolName: "remember_fact",
     });
@@ -186,7 +212,8 @@ describe("findToolConfigProblem", () => {
       tasks: { chat: ["send_email"] },
     };
 
-    expect(findToolConfigProblem(config, EFFECTS)).toEqual({
+    expect(classifyToolConfig(config, EFFECTS)).toEqual({
+      ok: false,
       problem: "TOOL_UNCLASSIFIED",
       toolName: "send_email",
     });
@@ -195,10 +222,11 @@ describe("findToolConfigProblem", () => {
   it.each(["constructor", "__proto__", "toString"])(
     "does not mistake the prototype key %s for a policy entry (KP-08)",
     (toolName) => {
-      const effects = new Map<string, ToolEffect>([[toolName, "read"]]);
+      const effects = toolsOf([[toolName, "read"]]);
       const config: ToolPolicyConfig = { policies: {}, tasks: { chat: [toolName] } };
 
-      expect(findToolConfigProblem(config, effects)).toEqual({
+      expect(classifyToolConfig(config, effects)).toEqual({
+        ok: false,
         problem: "TOOL_UNCLASSIFIED",
         toolName,
       });
@@ -211,6 +239,6 @@ describe("findToolConfigProblem", () => {
       tasks: { chat: ["remember_fact"] },
     };
 
-    expect(findToolConfigProblem(config, EFFECTS)?.problem).toBe("TOOL_POLICY_INVALID");
+    expect(classifyToolConfig(config, EFFECTS)).toMatchObject({ problem: "TOOL_POLICY_INVALID" });
   });
 });

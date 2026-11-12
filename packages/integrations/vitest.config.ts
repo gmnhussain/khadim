@@ -8,6 +8,11 @@ export default mergeConfig(
   vitestBaseConfig,
   defineConfig({
     test: {
+      coverage: {
+        // Production code only: test helpers, hand-built fixtures and the owner-only recording
+        // script are not what the coverage report is about (finding I17).
+        exclude: ["src/**/testing/**", "src/**/fixtures/**", "src/**/*.record.ts"],
+      },
       projects: [
         {
           // Not a test project: the owner runs it by hand to record fixtures (phase-1 plan, D-6). No

@@ -14,26 +14,31 @@ export interface GetCurrentTimeToolDependencies {
 /** IANA names such as `Asia/Dhaka` or `UTC`; raw offsets such as `+06:00` are not names. */
 const TIME_ZONE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_+\-/]*$/;
 const MAX_TIME_ZONE_LENGTH = 64;
+/**
+ * The locale `Intl` formats with. Only the parts are read, by type, so the locale does not
+ * change the result; a fixed one keeps it the same on every machine (finding #17).
+ */
+const FORMAT_LOCALE = "en-US";
 
 /**
  * Returns the name `Intl` resolves a known IANA time zone to, or nothing for an unknown one. That
  * is not always the canonical name: Node 24's ICU returns some legacy links, such as
  * `Asia/Calcutta`, as given (finding #12).
  */
-function resolveTimeZone(name: string): string | undefined {
+const resolveTimeZone = (name: string): string | undefined => {
   if (!TIME_ZONE_NAME_PATTERN.test(name)) {
     return undefined;
   }
   try {
-    return new Intl.DateTimeFormat("en-US", { timeZone: name }).resolvedOptions().timeZone;
+    return new Intl.DateTimeFormat(FORMAT_LOCALE, { timeZone: name }).resolvedOptions().timeZone;
   } catch {
     // Intl throws a RangeError for a time zone it does not know.
     return undefined;
   }
-}
+};
 
-function formatLocalDateTime(instant: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
+const formatLocalDateTime = (instant: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat(FORMAT_LOCALE, {
     timeZone,
     hourCycle: "h23",
     year: "numeric",
@@ -55,7 +60,7 @@ function formatLocalDateTime(instant: Date, timeZone: string) {
     localDate: `${read("year")}-${read("month")}-${read("day")}`,
     localTime: `${read("hour")}:${read("minute")}:${read("second")}`,
   };
-}
+};
 
 const inputSchema = z.strictObject({
   timeZone: z

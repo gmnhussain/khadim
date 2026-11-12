@@ -88,13 +88,13 @@ interface HandledToolCall {
   readonly pendingActionId: string | undefined;
 }
 
-function isToolCall(part: LlmAssistantPart): part is LlmToolCallPart {
+const isToolCall = (part: LlmAssistantPart): part is LlmToolCallPart => {
   return part.type === "tool_call";
-}
+};
 
-function joinText(content: readonly LlmAssistantPart[]): string {
+const joinText = (content: readonly LlmAssistantPart[]): string => {
   return content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
-}
+};
 
 /**
  * Creates the tool-calling loop (ADR-0005). `runAgent` calls the model, executes the tools it
@@ -389,6 +389,7 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
       );
       const handledCalls: HandledToolCall[] = [];
       if (canRunInParallel(effects)) {
+        // Reads change nothing, so they run at the same time and are recorded together.
         const performedCalls = await Promise.all(
           checkedCalls.map((checked) => performToolCall(stepNumber, checked)),
         );
@@ -397,9 +398,13 @@ export function createAgentLoop(dependencies: AgentLoopDependencies) {
         }
         return handledCalls;
       }
+      // Writes and external calls are recorded as each one runs, before the next starts, so a
+      // crash part-way through a step loses nothing that already happened (owner, 2026-11-12;
+      // review fixes, fix 6.4 partly reverted).
       for (const checked of checkedCalls) {
-        const performed = await performToolCall(stepNumber, checked);
-        handledCalls.push(await recordToolCall(stepNumber, performed));
+        handledCalls.push(
+          await recordToolCall(stepNumber, await performToolCall(stepNumber, checked)),
+        );
       }
       return handledCalls;
     }

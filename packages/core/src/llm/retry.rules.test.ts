@@ -22,6 +22,7 @@ describe("isEmittedContent", () => {
     [{ type: "started" }, false],
     [{ type: "reasoning" }, false],
     [{ type: "text_delta", text: "Hi" }, true],
+    [{ type: "text_delta", text: "" }, false],
     [{ type: "tool_call_started", toolCallId: "call_1", toolName: "get_current_time" }, true],
     [{ type: "completed", response: createTextResponse("Hi") }, false],
   ])("counts %j as emitted content: %s (D-9 rule 2)", (event, expected) => {
@@ -53,6 +54,26 @@ describe("computeBackoffMs", () => {
     expect(computeBackoffMs(7, 0)).toBe(15_000);
     expect(computeBackoffMs(1000, 0.999_999)).toBe(29_999);
   });
+});
+
+describe("retry inputs (L7)", () => {
+  it.each([1, 1.5, -0.1, Number.NaN])(
+    "refuses a random value of %d: the injected source breaks its contract",
+    (randomValue) => {
+      expect(() => computeBackoffMs(1, randomValue)).toThrow("random value is not in [0, 1)");
+      expect(() => decideRetry(input({ randomValue }))).toThrow("random value is not in [0, 1)");
+    },
+  );
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
+    "ignores a retryAfterMs of %d and waits the backoff",
+    (retryAfterMs) => {
+      expect(decideRetry(input({ problem: "LLM_RATE_LIMITED", retryAfterMs }))).toEqual({
+        retry: true,
+        delayMs: 500,
+      });
+    },
+  );
 });
 
 describe("decideRetry", () => {

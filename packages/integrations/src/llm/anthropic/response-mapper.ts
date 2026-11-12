@@ -21,7 +21,7 @@ export function mapUsage(usage: Anthropic.Usage): LlmUsage {
   };
 }
 
-function mapStopReason(stopReason: Anthropic.StopReason | null): LlmStopReason | undefined {
+const mapStopReason = (stopReason: Anthropic.StopReason | null): LlmStopReason | undefined => {
   switch (stopReason) {
     case "end_turn":
     case "stop_sequence":
@@ -39,9 +39,9 @@ function mapStopReason(stopReason: Anthropic.StopReason | null): LlmStopReason |
       // `pause_turn` belongs to server tools, which this adapter never declares.
       return undefined;
   }
-}
+};
 
-function mapContentBlock(block: Anthropic.ContentBlock, usage: LlmUsage): LlmAssistantPart {
+const mapContentBlock = (block: Anthropic.ContentBlock, usage: LlmUsage): LlmAssistantPart => {
   if (block.type === "text") {
     return { type: "text", text: block.text };
   }
@@ -55,11 +55,11 @@ function mapContentBlock(block: Anthropic.ContentBlock, usage: LlmUsage): LlmAss
   // Server-tool blocks: this adapter declares no server tools, so none should arrive. The call
   // still used tokens, so they go with the error and its cost is recorded (BR-23, I6).
   throw new LlmError("LLM_REQUEST_REJECTED", { reason: "unexpected_content_block", usage });
-}
+};
 
-function isCompleted(stopReason: LlmStopReason): stopReason is LlmCompletedStopReason {
+const isCompleted = (stopReason: LlmStopReason): stopReason is LlmCompletedStopReason => {
   return STOP_REASON_PROBLEMS[stopReason] === undefined;
-}
+};
 
 /**
  * Maps a finished message. A refusal, a cut-off answer and a context overflow are thrown as

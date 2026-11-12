@@ -579,6 +579,34 @@ describe("runAgent: tool order", () => {
       "end read_second",
     ]);
   });
+
+  it("records each call of an in-order step before the next one runs, so a crash loses nothing done (fix 6.4)", async () => {
+    let countRecorded: () => number = () => 0;
+    const recordedWhenSecondRan: number[] = [];
+    const secondWrite = defineTool({
+      name: "write_second",
+      description: "Notes how many calls were recorded when it ran.",
+      effect: "local_write",
+      inputSchema: z.strictObject({}),
+      handler: () => {
+        recordedWhenSecondRan.push(countRecorded());
+        return Promise.resolve({});
+      },
+    });
+    const fixture = createFixture({
+      steps: [reply(twoCalls("write_first", "write_second")), reply(createTextResponse("Done."))],
+      extraTools: [createOrderTool("write_first", "local_write", []), secondWrite],
+    });
+    countRecorded = () => fixture.runStore.toolCalls.length;
+
+    await fixture.run();
+
+    expect(recordedWhenSecondRan).toEqual([1]);
+    expect(fixture.runStore.toolCalls.map((call) => call.toolName)).toEqual([
+      "write_first",
+      "write_second",
+    ]);
+  });
 });
 
 describe("runAgent: approval (BR-02)", () => {
