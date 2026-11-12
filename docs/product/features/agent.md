@@ -143,6 +143,8 @@ A failed run carries exactly one problem: an agent problem, or the LLM problem t
 - **Stream fails after only reasoning content:** nothing counts as emitted, so the call is retried (owner, 2026-11-12).
 - **Cost of one call:** rounded up to a whole micro-USD; a run's total is the sum of its rounded calls (owner, 2026-11-12).
 - **Prompt at the price-tier boundary:** cost uses the tier chosen by prompt size, tested on both sides of the boundary (plan P-6).
+- **A configuration key that is not a name, such as `__proto__`:** the tool configuration is rejected with `TOOL_POLICY_INVALID`, and the model catalog with `LLM_ROUTE_INVALID`; the key is never silently dropped (KP-21; ADR-0014).
+- **A tool whose input schema is not strict all the way down, has an untyped field, or accepts no input at its root:** `defineTool` throws and the app does not start (review fixes, D-8).
 - **Tool description or result containing instructions:** treated as data; it cannot change policy, limits or which tools are offered (§15.11).
 
 ## Acceptance criteria

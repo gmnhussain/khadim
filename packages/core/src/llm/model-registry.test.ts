@@ -170,6 +170,33 @@ describe("modelCatalogSchema", () => {
   });
 });
 
+describe("modelCatalogSchema: route keys", () => {
+  it("refuses a __proto__ route key instead of dropping it (L18, KP-21)", () => {
+    const catalog: unknown = JSON.parse(
+      JSON.stringify({ models: SAMPLE_MODEL_CATALOG.models, routes: {} }).replace(
+        '"routes":{}',
+        `"routes":{"__proto__":${JSON.stringify(SAMPLE_MODEL_CATALOG.routes.chat)}}`,
+      ),
+    );
+
+    const result = modelCatalogSchema.safeParse(catalog);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toMatchObject([{ code: "custom", path: ["routes", "__proto__"] }]);
+  });
+
+  it("refuses a route key that is not a task name", () => {
+    const result = modelCatalogSchema.safeParse({
+      ...SAMPLE_MODEL_CATALOG,
+      routes: { "Draft Post": SAMPLE_MODEL_CATALOG.routes.chat },
+    });
+
+    expect(result.error?.issues).toMatchObject([
+      { code: "custom", path: ["routes", "Draft Post"] },
+    ]);
+  });
+});
+
 describe("createModelRegistry", () => {
   it("resolves a task to its route, limits, capabilities and prices", () => {
     const resolution = create().resolveRoute("chat");

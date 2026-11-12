@@ -97,17 +97,34 @@ describe("get_current_time", () => {
     },
   );
 
-  it("accepts a zone name of 64 characters only if it is known, and reports 65 as too long", () => {
+  it("accepts a zone name of 64 characters only if it is known", () => {
     const tool = createTool();
 
     expect(tool.prepare({ timeZone: "x".repeat(64) })).toMatchObject({
       ok: false,
       issues: [{ path: "input.timeZone", code: "custom" }],
     });
-    expect(tool.prepare({ timeZone: "x".repeat(65) })).toMatchObject({
+  });
+
+  it("reports only too_big for a zone over 64 characters: the zone check does not run (#6, KP-22)", () => {
+    const prepared = createTool().prepare({ timeZone: "x".repeat(65) });
+
+    expect(prepared).toEqual({
       ok: false,
-      issues: [{ path: "input.timeZone", code: "too_big" }, { path: "input.timeZone" }],
+      issues: [{ path: "input.timeZone", code: "too_big", message: expect.any(String) as string }],
     });
+  });
+
+  it("returns a legacy link name as Intl resolves it, which may not be canonical (#12)", async () => {
+    const resolved = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Calcutta",
+    }).resolvedOptions().timeZone;
+    const prepared = createTool().prepare({ timeZone: "Asia/Calcutta" });
+    if (!prepared.ok) {
+      throw new Error("expected a known zone");
+    }
+
+    await expect(prepared.execute()).resolves.toMatchObject({ timeZone: resolved });
   });
 
   it("tells the model how to fix an unknown zone", () => {

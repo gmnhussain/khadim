@@ -87,11 +87,14 @@ function refuse(problem: ToolCallProblem, detail?: string): ToolCallRefusal {
   return { ok: false, problem, message: detail === undefined ? message : `${message} ${detail}` };
 }
 
+/** The first issues, and how many more were left out, so the model can fix them in one go. */
 function describeIssues(issues: readonly ToolInputIssue[]): string {
-  return issues
+  const reported = issues
     .slice(0, MAX_REPORTED_ISSUES)
     .map((issue) => `${issue.path}: ${issue.message}`)
     .join("; ");
+  const leftOut = issues.length - MAX_REPORTED_ISSUES;
+  return leftOut > 0 ? `${reported}; and ${leftOut} more` : reported;
 }
 
 /**

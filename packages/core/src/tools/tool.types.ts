@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+import { namedRecordSchema, TASK_NAME_PATTERN, TOOL_NAME_PATTERN } from "../shared";
+
 /** What a tool changes: nothing, Khadim's own state, or something outside Khadim (ADR-0011). */
 export const TOOL_EFFECTS = ["read", "local_write", "external"] as const;
 
@@ -58,10 +60,13 @@ export const toolPolicyEntrySchema = z.strictObject({
   maxCallsPerDay: z.int().min(MIN_CALL_LIMIT).optional(),
 });
 
-/** Tool configuration: a policy per tool name, and the tools each task may use (ADR-0011). */
+/**
+ * Tool configuration: a policy per tool name, and the tools each task may use (ADR-0011). Keys
+ * are names, checked before parsing so none is silently dropped (KP-21; ADR-0014).
+ */
 export const toolPolicyConfigSchema = z.strictObject({
-  policies: z.record(z.string(), toolPolicyEntrySchema),
-  tasks: z.record(z.string(), z.array(z.string())),
+  policies: namedRecordSchema(TOOL_NAME_PATTERN, toolPolicyEntrySchema),
+  tasks: namedRecordSchema(TASK_NAME_PATTERN, z.array(z.string())),
 });
 
 /** The owner's policy for one tool. */

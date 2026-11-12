@@ -154,6 +154,49 @@ describe("mapRequest: tools (plan D-3)", () => {
     expect(JSON.stringify(tool)).not.toContain('"maxLength"');
   });
 
+  it("keeps enum and const in the strict schema (review fixes, D-8)", () => {
+    const tool = {
+      name: "share_post",
+      description: "Shares a post.",
+      inputJsonSchema: {
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: {
+          platform: { type: "string", enum: ["linkedin", "facebook"] },
+          kind: { type: "string", const: "post" },
+        },
+        required: ["platform", "kind"],
+        additionalProperties: false,
+      },
+    };
+
+    const [mapped] = mapRequest(request({ tools: [tool] })).tools ?? [];
+
+    expect(mapped).toMatchObject({
+      input_schema: {
+        properties: {
+          platform: { type: "string", enum: ["linkedin", "facebook"] },
+          kind: { type: "string", const: "post" },
+        },
+      },
+    });
+  });
+
+  it("does not change a frozen tool schema", () => {
+    const schema = Object.freeze({
+      type: "object",
+      properties: Object.freeze({ text: Object.freeze({ type: "string", maxLength: 5 }) }),
+      additionalProperties: false,
+    });
+
+    expect(() =>
+      mapRequest(
+        request({ tools: [{ name: "save_note", description: "Saves.", inputJsonSchema: schema }] }),
+      ),
+    ).not.toThrow();
+    expect(schema.properties.text).toEqual({ type: "string", maxLength: 5 });
+  });
+
   it("does not change the tool definition it was given", () => {
     const before = JSON.stringify(TIME_TOOL);
 

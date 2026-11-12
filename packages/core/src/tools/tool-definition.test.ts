@@ -85,6 +85,64 @@ describe("defineTool", () => {
     ).toThrow("tool input schema is not a strict object: save_note");
   });
 
+  const defineWith = (inputSchema: z.ZodType) => () =>
+    defineTool({
+      name: "save_note",
+      description: "Saves a note.",
+      effect: "local_write",
+      inputSchema,
+      handler: () => Promise.resolve({}),
+    });
+
+  it("refuses a nested object that lets unknown keys through (R1)", () => {
+    expect(defineWith(z.strictObject({ draft: z.object({ text: z.string() }) }))).toThrow(
+      "tool input schema is not a strict object at input.draft: save_note",
+    );
+  });
+
+  it("refuses an object in a list that lets unknown keys through (R1)", () => {
+    expect(defineWith(z.strictObject({ notes: z.array(z.object({ text: z.string() })) }))).toThrow(
+      "tool input schema is not a strict object at input.notes[]: save_note",
+    );
+  });
+
+  it("refuses an object in a union that lets unknown keys through (R1)", () => {
+    expect(
+      defineWith(z.strictObject({ note: z.union([z.string(), z.object({ text: z.string() })]) })),
+    ).toThrow("tool input schema is not a strict object at input.note: save_note");
+  });
+
+  it("accepts strict objects all the way down", () => {
+    const schema = z.strictObject({
+      draft: z.strictObject({ text: z.string() }),
+      notes: z.array(z.strictObject({ text: z.string() })).optional(),
+      note: z.union([z.string(), z.strictObject({ text: z.string() })]).nullable(),
+    });
+
+    expect(defineWith(schema)().name).toBe("save_note");
+  });
+
+  it("refuses a strict object made optional at the root, which its JSON Schema hides (#5)", () => {
+    expect(defineWith(z.strictObject({ text: z.string() }).optional())).toThrow(
+      "tool input schema accepts no input at its root: save_note",
+    );
+  });
+
+  it("refuses a strict object made nullable at the root", () => {
+    expect(defineWith(z.strictObject({ text: z.string() }).nullable())).toThrow(
+      "tool input schema is not a strict object: save_note",
+    );
+  });
+
+  it.each([
+    ["z.unknown()", z.unknown()],
+    ["z.any()", z.any()],
+  ])("refuses a field typed %s: strict tools need a type (review fixes, D-8)", (_, field) => {
+    expect(defineWith(z.strictObject({ value: field }))).toThrow(
+      "tool input schema has no type at input.value: save_note",
+    );
+  });
+
   it("refuses an input schema that is not an object", () => {
     expect(() =>
       defineTool({

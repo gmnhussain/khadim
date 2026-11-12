@@ -1,5 +1,4 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { transformJSONSchema } from "@anthropic-ai/sdk/lib/transform-json-schema";
 import { LlmError } from "@khadim/core/llm/llm.errors";
 import type {
   LlmAssistantPart,
@@ -8,6 +7,8 @@ import type {
   LlmSystemPart,
   LlmToolDefinition,
 } from "@khadim/core/llm/llm.types";
+
+import { toStrictInputSchema } from "./strict-schema";
 
 /** The provider id of this adapter; reasoning parts carry it (glossary: Provider). */
 export const ANTHROPIC_PROVIDER_ID = "anthropic";
@@ -48,16 +49,17 @@ function mapSystem(system: readonly LlmSystemPart[]): Anthropic.TextBlockParam[]
 }
 
 /**
- * A strict tool (plan D-3). Strict schemas reject keywords such as `maxLength` and `minimum`
- * with a 400, so the SDK's own transform moves them into the description; core's tool
- * registry still enforces them with Zod before a handler runs.
+ * A strict tool (phase-1 plan, D-3). Strict schemas reject keywords such as `maxLength` and
+ * `minimum` with a 400, so the adapter's own transform moves them into the description and
+ * keeps `enum` and `const`; core's tool registry still enforces every keyword with Zod before a
+ * handler runs (review fixes, D-8).
  */
 function mapTool(tool: LlmToolDefinition): Anthropic.Tool {
   const { $schema: _dialect, ...schema } = tool.inputJsonSchema;
   return {
     name: tool.name,
     description: tool.description,
-    input_schema: { ...transformJSONSchema(schema), type: "object" },
+    input_schema: { ...toStrictInputSchema(schema), type: "object" },
     strict: true,
   };
 }

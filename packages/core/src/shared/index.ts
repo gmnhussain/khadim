@@ -15,3 +15,4 @@ export {
   type IdGeneratorDependencies,
   type RandomBytes,
 } from "./ids";
+export { namedRecordSchema, TASK_NAME_PATTERN, TOOL_NAME_PATTERN } from "./names";

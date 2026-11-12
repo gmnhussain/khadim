@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+import { namedRecordSchema, TASK_NAME_PATTERN } from "../shared";
+
 import { LlmError, type LlmProblem } from "./llm.errors";
 import {
   LLM_EFFORTS,
@@ -38,10 +40,13 @@ const taskRouteSchema = z.strictObject({
   timeoutMs: z.int().min(MIN_POSITIVE).default(DEFAULT_TIMEOUT_MS),
 });
 
-/** The model catalog: usable models with capabilities and prices, and one route per task (ADR-0009). */
+/**
+ * The model catalog: usable models with capabilities and prices, and one route per task
+ * (ADR-0009). Route keys are task names, checked before parsing so none is dropped (KP-21).
+ */
 export const modelCatalogSchema = z.strictObject({
   models: z.array(catalogModelSchema),
-  routes: z.record(z.string(), taskRouteSchema),
+  routes: namedRecordSchema(TASK_NAME_PATTERN, taskRouteSchema),
 });
 
 /** The model catalog as written in configuration. */

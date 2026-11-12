@@ -58,6 +58,34 @@ describe("toolPolicyEntrySchema", () => {
 });
 
 describe("toolPolicyConfigSchema", () => {
+  it.each([
+    ["policies", '{"policies":{"__proto__":{"policy":"auto"}},"tasks":{}}'],
+    ["tasks", '{"policies":{},"tasks":{"__proto__":["read_note"]}}'],
+  ])("refuses a __proto__ key in %s instead of dropping it (#7, KP-21)", (field, json) => {
+    const result = toolPolicyConfigSchema.safeParse(JSON.parse(json));
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toMatchObject([{ code: "custom", path: [field, "__proto__"] }]);
+  });
+
+  it.each([
+    ["policies", { policies: { ReadNote: { policy: "auto" } }, tasks: {} }],
+    ["policies", { policies: { read: { policy: "auto" } }, tasks: {} }],
+    ["tasks", { policies: {}, tasks: { "draft-post": [] } }],
+  ])("refuses a key in %s that is not a name", (field, config) => {
+    const result = toolPolicyConfigSchema.safeParse(config);
+
+    expect(result.error?.issues.map((issue) => [issue.code, issue.path[0]])).toEqual([
+      ["custom", field],
+    ]);
+  });
+
+  it("accepts one-word task names such as chat", () => {
+    expect(toolPolicyConfigSchema.safeParse({ policies: {}, tasks: { chat: [] } }).success).toBe(
+      true,
+    );
+  });
+
   it("accepts policies by tool name and tools by task", () => {
     const result = toolPolicyConfigSchema.safeParse({
       policies: { get_current_time: { policy: "auto", maxCallsPerRun: 5 } },

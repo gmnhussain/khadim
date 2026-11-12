@@ -298,10 +298,11 @@ describe("resolveToolCalls: one call", () => {
       throw new Error("expected a refusal");
     }
 
-    expect(resolution.message.split("; ")).toHaveLength(5);
+    expect(resolution.message.split("; ")).toHaveLength(6);
     expect(resolution.message).toContain("input.a: ");
     expect(resolution.message).toContain("input.e: ");
     expect(resolution.message).not.toContain("input.f: ");
+    expect(resolution.message).toMatch(/; and 2 more$/);
   });
 
   it.each([

@@ -15,7 +15,11 @@ export interface GetCurrentTimeToolDependencies {
 const TIME_ZONE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_+\-/]*$/;
 const MAX_TIME_ZONE_LENGTH = 64;
 
-/** Returns the canonical name of a known IANA time zone, or nothing for an unknown one. */
+/**
+ * Returns the name `Intl` resolves a known IANA time zone to, or nothing for an unknown one. That
+ * is not always the canonical name: Node 24's ICU returns some legacy links, such as
+ * `Asia/Calcutta`, as given (finding #12).
+ */
 function resolveTimeZone(name: string): string | undefined {
   if (!TIME_ZONE_NAME_PATTERN.test(name)) {
     return undefined;
@@ -56,7 +60,9 @@ function formatLocalDateTime(instant: Date, timeZone: string) {
 const inputSchema = z.strictObject({
   timeZone: z
     .string()
-    .max(MAX_TIME_ZONE_LENGTH)
+    // `abort`: Zod 4 runs the next check after a failed one, so without it the refine would
+    // still run on an over-long string (KP-22).
+    .max(MAX_TIME_ZONE_LENGTH, { abort: true })
     .refine((name) => resolveTimeZone(name) !== undefined, {
       message: "Unknown time zone: use an IANA name such as Europe/Berlin",
     })
