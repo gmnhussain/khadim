@@ -1,6 +1,8 @@
 # Markdown is written by hand and not reformatted (conventions §6).
 *.md
 pnpm-lock.yaml
+# Recorded HTTP fixtures are kept byte for byte. Hand-built ones are TypeScript and formatted.
+packages/integrations/src/llm/*/fixtures/**/*.json
 dist/
 .next/
 coverage/

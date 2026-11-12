@@ -89,13 +89,15 @@ module.exports = {
     {
       name: "testing-only-in-tests",
       comment:
-        "Fakes in a module's testing/ folder are for tests: only test files and other testing/ folders import them.",
+        "Fakes in a testing/ folder and HTTP fixtures in a fixtures/ folder are for tests: only test files and other testing/ and fixtures/ folders import them.",
       severity: "error",
       from: {
         path: "^packages/[^/]+/src/",
-        pathNot: ["\\.(test|int\\.test|spec)\\.ts$", "/testing/"],
+        pathNot: ["\\.(test|int\\.test|spec)\\.ts$", "/testing/", "/fixtures/"],
       },
-      to: { path: "^packages/[^/]+/src/.+/testing/" },
+      to: {
+        path: ["^packages/[^/]+/src/testing/", "^packages/[^/]+/src/.+/(testing|fixtures)/"],
+      },
     },
     {
       name: "not-to-test-files",
@@ -106,11 +108,12 @@ module.exports = {
     },
     {
       name: "not-to-dev-dependencies",
-      comment: "Production code never imports devDependencies.",
+      comment:
+        "Production code never imports devDependencies. Test files and testing/ folders may; testing-only-in-tests keeps those folders out of production code.",
       severity: "error",
       from: {
         path: "^(apps|packages)/[^/]+/src/",
-        pathNot: "\\.(test|int\\.test|spec)\\.ts$",
+        pathNot: ["\\.(test|int\\.test|spec)\\.ts$", "/testing/"],
       },
       to: { dependencyTypes: ["npm-dev"] },
     },

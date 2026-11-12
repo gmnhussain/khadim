@@ -1,0 +1,6 @@
+{
+  "extends": "@khadim/config/tsconfig/node.json",
+  "include": ["src"],
+  // Test files are typechecked separately, with the test preset (tsconfig.test.json).
+  "exclude": ["src/**/*.test.ts"]
+}

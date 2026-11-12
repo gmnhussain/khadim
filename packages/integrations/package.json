@@ -1,0 +1,30 @@
+{
+  "name": "@khadim/integrations",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Adapters that implement core ports, one folder per vendor.",
+  "type": "module",
+  "exports": {
+    "./llm/anthropic": "./src/llm/anthropic/anthropic.adapter.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test:unit": "vitest run --project unit --coverage",
+    "record:anthropic": "vitest run --project record"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "catalog:",
+    "@khadim/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@khadim/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "eslint": "catalog:",
+    "msw": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
