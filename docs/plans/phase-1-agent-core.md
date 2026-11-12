@@ -155,6 +155,18 @@ Package APIs were checked against the published packages before this section was
 
 > **Owner answer (2026-11-12):** Approved: schema and validation only in 1a, with D-1's values as a test sample.
 
+> **Owner answer (2026-11-12):** Increment 4 is approved, and these choices, made while writing it, are confirmed:
+> - Messages have three roles: `user`, `assistant` and `tool`. Tool results are their own message, so the shape mirrors neither Anthropic's nor the Chat Completions format (P-2); each adapter maps it.
+> - Stop reasons are `end_turn`, `tool_calls`, `max_output`, `refusal` and `context_exceeded`. A completed response carries only the first two. For the other three the adapter throws the `LlmError` that one map in core (`STOP_REASON_PROBLEMS`) names, so D-8 holds and every adapter agrees.
+> - An `LlmError` can carry the tokens the failed call used, so a refused or cut-off call still has its cost recorded (BR-23).
+> - Stream events are `started`, `reasoning`, `text_delta`, `tool_call_started` and `completed`. Only `text_delta` and `tool_call_started` count as emitted (D-9 rule 2).
+> - Backoff: 1 second before the second attempt, doubling, capped at 30 seconds, with equal jitter (half fixed, half random). The time-budget check applies to the final delay, whether it came from the backoff or from `retryAfterMs`. A call is retried only when that delay is strictly shorter than the remaining running time: a delay equal to it is refused, because the retry would meet `RUN_TIME_LIMIT` the moment the wait ended (owner's review fix, 2026-11-12).
+> - Catalog shape: `models` (provider, id, capabilities, price tiers) and `routes` by task (provider, model, optional effort, `maxAttempts`, `maxOutputTokens`, `timeoutMs`). Effort levels are `low`, `medium` and `high`.
+> - A tier applies up to and including its `maxPromptTokens`; prompt size is fresh input plus cache writes and cache reads; the whole call is billed at the tier its prompt selects.
+> - What each task needs from its model is passed to the registry by the composition root, not written in the catalog. Needs are capability flags only; a context-size need is not built.
+> - A malformed catalog and a model listed twice also stop startup with `LLM_ROUTE_INVALID`.
+> - The timeout cap by the run's remaining running time is applied by the loop, in increment 5.
+
 #### 5. `core/src/agent`
 
 - Scope: core · tests.

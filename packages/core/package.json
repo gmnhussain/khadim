@@ -5,6 +5,8 @@
   "description": "Business and agent logic for Khadim; defines the ports that adapters implement.",
   "type": "module",
   "exports": {
+    "./llm": "./src/llm/index.ts",
+    "./llm/testing": "./src/llm/testing/index.ts",
     "./shared": "./src/shared/index.ts",
     "./shared/testing": "./src/shared/testing/index.ts",
     "./tools": "./src/tools/index.ts",

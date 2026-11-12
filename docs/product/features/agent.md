@@ -50,7 +50,7 @@ flowchart TD
   limits -->|no| call[Call the model through LlmProvider]
   call --> result{Result}
   result -->|refusal| refused[Run failed: LLM_REFUSED]
-  result -->|error| retry{Retryable, nothing emitted,<br/>attempts left, delay fits<br/>the time budget?}
+  result -->|error| retry{Retryable, nothing emitted,<br/>attempts left, delay shorter than<br/>the running time left?}
   retry -->|no| failedcall[Run failed with the mapped code]
   retry -->|yes| wait[Wait: backoff with jitter<br/>or retryAfterMs, whichever is longer]
   wait -->|cancel during wait| cancelled
@@ -100,8 +100,11 @@ The closed unions of conventions §12.1. "Documented" codes come from convention
 | `LLM_RATE_LIMITED` | Documented | The provider rate-limited the call; carries an optional `retryAfterMs` | Yes | Run fails |
 | `LLM_UNAVAILABLE` | Documented | The provider is overloaded, failing, unreachable or timed out | Yes | Run fails |
 | `LLM_REFUSED` | Documented | The model refused (plan D-8) | No | Run fails |
-| `LLM_REQUEST_REJECTED` | New | The provider rejected the request as invalid, unauthorised, unpaid or too large | No | Run fails |
-| `LLM_ROUTE_INVALID` | New | A route names an unknown model, a provider that is not enabled, or a model without a capability the task needs (BR-25) | — | Configuration is rejected; the app does not start |
+| `LLM_REQUEST_REJECTED` | New | The provider rejected the request as invalid: a bug in Khadim | No | Run fails |
+| `LLM_NOT_AUTHORIZED` | New (owner, 2026-11-12) | The key is invalid, a permission is missing, or credit or billing is exhausted: the owner fixes it | No | Run fails |
+| `LLM_OUTPUT_TRUNCATED` | New (owner, 2026-11-12) | The call stopped at its maximum output. Cut-off text is never an answer and a cut-off tool call never executes | No | Run fails |
+| `LLM_CONTEXT_EXCEEDED` | New (owner, 2026-11-12) | The context is larger than the model's limit | No | Run fails |
+| `LLM_ROUTE_INVALID` | New | The model catalog is malformed, or a route names an unknown model, a provider that is not enabled, or a model without a capability the task needs (BR-25) | — | Configuration is rejected; the app does not start |
 
 **Agent problems** (`AgentProblem`, `agent.errors.ts`)
 
@@ -121,10 +124,13 @@ A failed run carries exactly one problem: an agent problem, or the LLM problem t
 - **A step with both an `auto` and an `approve` call:** every call is handled first; the run then pauses (agent design §1).
 - **Stream fails before any text or tool call:** retried under D-9. Provider metadata (start, ping, usage) does not count as emitted.
 - **Stream fails after text or a tool call was emitted:** the step fails with the mapped code; no retry (D-9 rule 2).
-- **`retryAfterMs` longer than the remaining running time:** the run fails without waiting (D-9 rule 1).
+- **Retry delay not shorter than the remaining running time:** the run fails without waiting, with `LLM_RATE_LIMITED` or `LLM_UNAVAILABLE`, whichever the call returned. A call is retried only when its delay, from the backoff or from `retryAfterMs`, is strictly shorter than the running time left; a wait that ends exactly at the limit leaves no time for the call (D-9 rule 1; owner, 2026-11-12).
 - **Cancel during a retry wait:** the wait ends at once and the run ends as `cancelled` (D-9 rule 5).
 - **History inside a run:** append-only in 1a. Nothing is trimmed or summarised, and reasoning parts go back to the provider exactly as received; trimming and summarising are decided in the 1b plan (owner, 2026-11-12).
-- **Context larger than the model's limit:** the run fails (owner, 2026-11-12); the code is an open question below.
+- **Context larger than the model's limit:** the run fails with `LLM_CONTEXT_EXCEEDED` (owner, 2026-11-12).
+- **Call stopped at its maximum output:** the run fails with `LLM_OUTPUT_TRUNCATED`; the cut-off text is not returned and a cut-off tool call is not executed (owner, 2026-11-12).
+- **Stream fails after only reasoning content:** nothing counts as emitted, so the call is retried (owner, 2026-11-12).
+- **Cost of one call:** rounded up to a whole micro-USD; a run's total is the sum of its rounded calls (owner, 2026-11-12).
 - **Prompt at the price-tier boundary:** cost uses the tier chosen by prompt size, tested on both sides of the boundary (plan P-6).
 - **Tool description or result containing instructions:** treated as data; it cannot change policy, limits or which tools are offered (§15.11).
 
@@ -144,9 +150,12 @@ All are proved by unit tests with `FakeLlmProvider`, an in-memory run store, a f
 - **Per-day limit.** Given a tool whose per-day limit is already reached by the injected day count, when the model calls it, then the handler does not run and the model receives `TOOL_LIMIT_REACHED`.
 - **Current time.** Given a fixed clock, when `get_current_time` is called with no input, then it returns the UTC timestamp, the configured zone and the local date and time; given an unknown zone, then the model receives `TOOL_INPUT_INVALID`.
 - **Refusal.** Given a reply with the refusal stop reason, when the run executes, then it ends `failed` with `LLM_REFUSED` and is not retried (plan D-8).
+- **Truncated output.** Given a reply that stops at its maximum output, when the run executes, then it ends `failed` with `LLM_OUTPUT_TRUNCATED`, no text is returned as the answer, no tool call from that reply executes, and the call is not retried.
+- **Context exceeded.** Given a call the provider reports as over the model's context limit, then the run ends `failed` with `LLM_CONTEXT_EXCEEDED` and the call is not retried.
+- **Not authorised.** Given a call rejected for an invalid key, a missing permission or exhausted credit, then the run ends `failed` with `LLM_NOT_AUTHORIZED` and the call is not retried.
 - **Retry before output.** Given a stream that fails with `LLM_UNAVAILABLE` before emitting text or a tool call, when attempts remain, then the call is retried after the computed delay (D-9).
 - **No retry after output.** Given a stream that fails after emitting text, or after emitting a tool call, then the step fails with the mapped code and is not retried (D-9 rule 2).
-- **Retry-After.** Given `LLM_RATE_LIMITED` with `retryAfterMs` longer than the backoff, then the wait is the full `retryAfterMs`; given `retryAfterMs` longer than the remaining running time, then the run fails without waiting (D-9 rule 1).
+- **Retry-After.** Given `LLM_RATE_LIMITED` with `retryAfterMs` longer than the backoff, then the wait is the full `retryAfterMs`; given `retryAfterMs` equal to or longer than the remaining running time, then the run fails without waiting (D-9 rule 1).
 - **Attempts.** Given a route with `maxAttempts` 3 and three retryable failures, then the third failure ends the call with its mapped code (D-9 rule 3).
 - **Cancel during a wait.** Given a cancel during a retry wait, then the wait ends at once and the run ends `cancelled` (D-9 rule 5).
 - **Invalid route.** Given a task that needs tools routed to a model without tool support, when the catalog is validated, then it is rejected with `LLM_ROUTE_INVALID` (BR-25).
@@ -166,13 +175,23 @@ Each needs the owner's answer before the increment named in brackets. Recommenda
 
 > **Open question:** What happens when a model call stops because it reached its maximum output? Options: fail the run with a new LLM code, or return the cut-off text as the answer. No documented code covers it. [increment 4]
 
+> **Owner answer (2026-11-12):** The run fails with a new code, `LLM_OUTPUT_TRUNCATED`, and the call is not retried. Cut-off text is never returned as an answer, and a cut-off tool call is never executed.
+
 > **Open question:** A run whose context would exceed the model's limit fails (owner, 2026-11-12; a run's history is append-only in 1a). Which code? The provider reports the overflow, as a rejected request or as a stop reason, so core cannot see it before the call. Recommendation: a new LLM code, `LLM_CONTEXT_EXCEEDED`, not retried, mapped by the adapter from both forms. [increment 4]
+
+> **Owner answer (2026-11-12):** `LLM_CONTEXT_EXCEEDED`. It is not retried.
 
 > **Open question:** Conventions §15.2 requires a maximum output and a timeout on every call; D-1 sets neither. What are the values per task? Recommendation: both live on the route in the catalog, and the timeout is also capped by the run's remaining running time. [increment 4]
 
+> **Owner answer (2026-11-12):** Both live on the route in the catalog. **Default:** 16,000 output tokens and a 120-second timeout per call, with the timeout capped by the run's remaining running time. Both are retuned after the first evals.
+
 > **Open question:** D-9 rule 2 counts only text and tool calls as emitted. Current Claude models also stream reasoning blocks, empty by default. Does a stream that fails after only reasoning count as "nothing emitted" and get retried? Recommendation: yes, nothing has reached the owner. [increment 4]
 
+> **Owner answer (2026-11-12):** A stream that fails after only reasoning content counts as nothing emitted under D-9 rule 2, and is retried.
+
 > **Open question:** Under D-9 rule 1, when the provider's delay exceeds the remaining running time, which code fails the run: `LLM_RATE_LIMITED` (the cause) or `RUN_TIME_LIMIT`? Recommendation: `LLM_RATE_LIMITED`, so the 1c fallback question keys on one code. [increment 4]
+
+> **Owner answer (2026-11-12):** The run fails with `LLM_RATE_LIMITED`.
 
 > **Open question:** For the loop, is `propose` the same as `auto` (the handler runs now and stores the proposal in its own module, the run continues, ADR-0011), with the difference living in the tool's module? No `propose` tool exists before Phase 2. [increment 3]
 
@@ -194,6 +213,10 @@ Each needs the owner's answer before the increment named in brackets. Recommenda
 
 > **Open question:** Is one code, `LLM_REQUEST_REJECTED`, enough for every non-retryable provider error, or should credential and billing failures (the owner can fix them) have their own code, separate from invalid requests (a bug)? [increment 4]
 
+> **Owner answer (2026-11-12):** Two codes. `LLM_REQUEST_REJECTED` is an invalid request, a bug in Khadim. A new `LLM_NOT_AUTHORIZED` is an invalid key, a missing permission, or exhausted credit or billing, which the owner fixes. Neither is retried.
+
 > **Open question:** Prices are integer micro-USD per million tokens, so one call's cost can be a fraction of a micro-USD. Round up, down or to nearest, per call? Recommendation: up, so a budget never undercounts. [increment 4]
+
+> **Owner answer (2026-11-12):** Cost is rounded up to a whole micro-USD per call; run totals are the sum of the rounded calls.
 
 > **Open question:** Conventions §12 lists `APPROVAL_REQUIRED` with no meaning. 1a does not use it (a pause is an outcome, not an error). Does it belong to the approvals feature doc in Phase 3? [no increment blocked]
