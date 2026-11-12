@@ -22,7 +22,8 @@ export const vitestBaseConfig = Object.freeze({
     unstubEnvs: true,
     coverage: {
       provider: "v8",
-      include: ["src/**"],
+      // Source only: files such as prompt Markdown under src/ are not code to instrument.
+      include: ["src/**/*.ts", "src/**/*.tsx"],
       reporter: ["text", "html"],
       // Glob thresholds do not inherit a top-level perFile, so it is set on the glob.
       thresholds: { [RULES_FILE_PATTERN]: { 100: true, perFile: true } },

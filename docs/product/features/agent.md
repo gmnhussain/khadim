@@ -112,7 +112,8 @@ The closed unions of conventions §12.1. "Documented" codes come from convention
 | --- | --- | --- | --- |
 | `RUN_ITERATION_LIMIT` | Documented | The run reached its iteration limit (BR-21) | Run fails |
 | `RUN_BUDGET_EXCEEDED` | Documented | The run reached its cost budget (BR-21) | Run fails |
-| `RUN_TIME_LIMIT` | New | The run reached its running-time limit (BR-21) | Run fails |
+| `RUN_TOKEN_LIMIT` | New (owner, 2026-11-12) | The run reached its token limit, counting input and output across all calls (BR-21) | Run fails |
+| `RUN_TIME_LIMIT` | New (owner, 2026-11-12) | The run reached its running-time limit (BR-21) | Run fails |
 
 A failed run carries exactly one problem: an agent problem, or the LLM problem that ended its last model call. Tool problems never fail a run by themselves; a model that keeps failing a tool runs into the iteration limit.
 
@@ -141,8 +142,11 @@ All are proved by unit tests with `FakeLlmProvider`, an in-memory run store, a f
 - **Final answer.** Given a scripted reply with text only, when the run executes, then it ends `succeeded` with one step, one LLM call and its cost recorded (BR-21, BR-23).
 - **Tool call.** Given a reply that calls `get_current_time` and then a final answer, when the run executes, then the tool result is appended, both steps are recorded and the run ends `succeeded`.
 - **Invalid tool input.** Given a tool call whose input fails the schema, when the step executes, then the handler is not called, the model receives a `TOOL_INPUT_INVALID` error result, and the run continues.
-- **Iteration limit.** Given replies that always call a tool, when the limit of BR-21 is reached, then the run ends `failed` with `RUN_ITERATION_LIMIT`.
+- **Iteration limit.** Given replies that always call a tool, when the limit of BR-21 is reached, then the run ends `failed` with `RUN_ITERATION_LIMIT`, and the tools asked for on the last allowed iteration are not executed.
 - **Cost budget.** Given usage whose cost reaches the per-run budget, when budgets are checked, then the run ends `failed` with `RUN_BUDGET_EXCEEDED` and no further model call is made.
+- **Token limit.** Given usage that reaches the per-run token limit, then the run ends `failed` with `RUN_TOKEN_LIMIT` and no further model call is made.
+- **Time limit.** Given running time that reaches the limit, then the run ends `failed` with `RUN_TIME_LIMIT` and no further model call is made.
+- **Final answer over budget.** Given a final answer from the call that crosses the cost or token budget, then the run ends `succeeded`: a budget stops the next call and never discards a finished answer.
 - **Cancellation between steps.** Given a cancel requested while a step runs, when the step finishes, then the run ends `cancelled` before the next model call.
 - **Approve policy.** Given a tool whose policy is `approve`, when the model calls it, then its handler does not execute, a pending action is requested and the run ends `awaiting_approval` (BR-02).
 - **Tier floor.** Given a policy that sets an `external` tool to `auto`, when the configuration is validated, then it is rejected with `TOOL_POLICY_INVALID` (BR-02, ADR-0011).
@@ -167,11 +171,19 @@ Each needs the owner's answer before the increment named in brackets. Recommenda
 
 > **Open question:** BR-21 lists a token limit but gives no number, and D-5 sets none. What is the per-run token limit, or is there none in 1a? [increment 5]
 
+> **Owner answer (2026-11-12):** **Default:** 500,000 tokens per run, counting input and output across all calls, retuned after the first evals. It stops runaway loops on cheap models, where the cost budget alone would allow millions of tokens.
+
 > **Open question:** Which code ends a run at the token limit: `RUN_BUDGET_EXCEEDED` (shared with cost) or its own code? Agent design §2 names only two codes for four limits. This doc proposes `RUN_TIME_LIMIT` for running time; is that name right? [increment 5]
+
+> **Owner answer (2026-11-12):** The token limit has its own code, `RUN_TOKEN_LIMIT`; `RUN_BUDGET_EXCEEDED` stays for cost only. `RUN_TIME_LIMIT` is the right name for the running-time limit.
 
 > **Open question:** When the call that returns the final answer is also the one that crosses the cost or token budget, does the run succeed (the answer is already paid for) or fail? Recommendation: succeed; a budget stops the next call, never discards a finished answer. [increment 5]
 
+> **Owner answer (2026-11-12):** The run succeeds: a budget stops the next call and never discards a finished answer.
+
 > **Open question:** When the model asks for tools on the last allowed iteration, are those tools executed before the run fails with `RUN_ITERATION_LIMIT`? Recommendation: no. [increment 5]
+
+> **Owner answer (2026-11-12):** They are not executed; the run fails with `RUN_ITERATION_LIMIT`.
 
 > **Open question:** What happens when a model call stops because it reached its maximum output? Options: fail the run with a new LLM code, or return the cut-off text as the answer. No documented code covers it. [increment 4]
 
@@ -199,6 +211,8 @@ Each needs the owner's answer before the increment named in brackets. Recommenda
 
 > **Open question:** Pending actions arrive in Phase 3. May 1a model the `approve` path with an injected "request pending action" dependency and a fake tool in `tools/testing`, so the pause is proved now? [increment 5]
 
+> **Owner answer (2026-11-12):** Yes: 1a proves the approve pause with an injected "request pending action" dependency and a fake approve tool. The real implementation comes with approvals in Phase 3; no production placeholder is added.
+
 > **Open question:** Per-day tool limits need call counts from earlier runs, which 1a does not store. Is the per-day limit a pure rule in 1a, fed a count by the caller, with real counts in 1b; or deferred entirely? [increment 3]
 
 > **Owner answer (2026-11-12):** A pure rule in 1a, fed the day's call count by an injected source. Tests use an in-memory count; real counts come from the database in 1b.
@@ -220,3 +234,5 @@ Each needs the owner's answer before the increment named in brackets. Recommenda
 > **Owner answer (2026-11-12):** Cost is rounded up to a whole micro-USD per call; run totals are the sum of the rounded calls.
 
 > **Open question:** Conventions §12 lists `APPROVAL_REQUIRED` with no meaning. 1a does not use it (a pause is an outcome, not an error). Does it belong to the approvals feature doc in Phase 3? [no increment blocked]
+
+> **Owner answer (2026-11-12):** Not used in 1a, because a pause is an outcome, not an error. `APPROVAL_REQUIRED` is defined by the approvals feature doc in Phase 3.

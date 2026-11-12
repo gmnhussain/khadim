@@ -7,7 +7,7 @@
 - Repositories use Drizzle and `@khadim/db` directly; persistence has no port (ADR-0012).
 - Modules import each other only through their `index.ts`.
 
-Built so far (Phase 1a): `shared` (errors, ids, clock) and `tools`, the reference module for core code (conventions §10.3): types, errors, pure policy rules, `defineTool`, the registry, `get_current_time` and test fakes; and `llm`: the `LlmProvider` port, provider-neutral types, errors, the retry, usage and routing rules, the model registry and `FakeLlmProvider`. The other modules arrive increment by increment ([plan](../../docs/plans/phase-1-agent-core.md#increments)).
+Built so far (Phase 1a): `shared` (errors, ids, clock) and `tools`, the reference module for core code (conventions §10.3): types, errors, pure policy rules, `defineTool`, the registry, `get_current_time` and test fakes; and `llm`: the `LlmProvider` port, provider-neutral types, errors, the retry, usage and routing rules, the model registry and `FakeLlmProvider`; and `agent`: the tool-calling loop (`runAgent`), its pure rules, the context builder and the versioned system prompt. The other modules arrive increment by increment ([plan](../../docs/plans/phase-1-agent-core.md#increments)).
 
 | Script | Does |
 | --- | --- |

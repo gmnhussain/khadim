@@ -179,6 +179,20 @@ Package APIs were checked against the published packages before this section was
 
 > **Owner answer (2026-11-12):** Approved: the stand-in type lives in `agent.types.ts`, is temporary, and moves to the repository in 1b.
 
+> **Owner answer (2026-11-12):** Increment 5 is approved, and these choices, made while writing it, are confirmed. `prompts/system.v1.md` is approved as written; wording changes come later as a new version, after evals.
+> - A limit reached by a call that asks for tools stops the run before those tools execute, for every limit, not only iterations: the results could never be sent to the model, and an `approve` tool would create a pending action on a failed run. A final answer is never discarded.
+> - Limits are reached when a total equals them. Tokens count fresh and cached input and output. Tokens and cost of failed attempts count too (BR-23).
+> - Cancel arrives as an `AbortSignal`. It is honoured before each model call and during a retry wait; a model call already in flight is not aborted (conventions §15.3).
+> - A stream that ends without a completed response is treated as `LLM_UNAVAILABLE`. An error from an adapter that is not an `LlmError` is a bug and is not caught.
+> - A step runs in parallel only when every call that will execute is a `read`; otherwise the whole step runs in order. Either way, calls are recorded and answered in the order the model asked.
+> - A tool's output goes to the model as JSON text; a refusal goes as its message, flagged as an error.
+> - When a step pauses for approval, the results of its other calls are recorded but not yet sent; resuming from them is 1b's (ADR-0010).
+> - The run store stand-in has four writes: model call, step, tool call, outcome. A run can start from earlier totals, which is what resume needs.
+> - Text deltas are read to track emission but go nowhere yet: the event stream to the browser is 1b's.
+> - Two files beyond the list above: `cancellable-sleep.ts`, the real sleep behind the injected one, and `prompts/prompt-loader.ts`, which reads a versioned prompt file once at startup.
+> - `agent.errors.ts` holds the problem union and messages only: the loop returns outcomes and never throws them; 1b's run service adds the error class when something throws it.
+> - The Vitest preset's coverage now includes only `.ts` and `.tsx` under `src/`, so the prompt Markdown is not parsed as code.
+
 #### 6. `integrations/src/llm/anthropic` and the contract suite
 
 - Scope: integrations · tests · config (add `@anthropic-ai/sdk` to the catalog, pinned exactly at 1.3.0; `msw` is already there).
@@ -280,6 +294,16 @@ Each gets its own detailed plan, written and approved when the previous slice is
 | Run store type | 1a's stand-in type in `agent.types.ts` moves to the repository (`ReturnType<typeof createAgentRunRepository>`, ADR-0012) |
 | Model catalog and tool policy file | 1a ships schema and validation only; the real file, with D-1's values confirmed against Anthropic's docs, lands with the worker (D-4) |
 | `test:integration` scripts | Added to each package with its first integration test |
+| Prompt files in the worker bundle | `prompts/prompt-loader.ts` reads `<purpose>.v<n>.md` next to its own source file. The worker's esbuild bundle must ship those files at the same relative path, or embed them; prove it with a start of the built worker |
+| Run events | The loop reads text deltas only to track emission (D-9 rule 2). 1b adds the event sink that writes `text.delta`, `tool.called` and the other events to the run's Redis Stream (ADR-0010) |
+| Cancelling a model call in flight | In 1a a cancel waits for the current model call, which can take up to the 120-second timeout. 1b's chat UI needs a cancel that aborts the call in flight: the run's `AbortSignal` passed to the provider (`LlmRequest.signal` exists for it), with the call's tokens still recorded when the provider reports them |
+
+### Carried into the Phase 3 plan (approvals)
+
+| Item | Notes |
+| --- | --- |
+| `APPROVAL_REQUIRED` | Conventions §12 lists the code without a meaning. 1a does not use it: a pause for approval is an outcome of the run, not an error. The approvals feature doc defines it (owner, 2026-11-12) |
+| Pending actions | 1a's loop asks for a pending action through an injected dependency, with a fake in tests and no production implementation. The approvals module provides the real one |
 
 ### Carried into the 1c plan
 
